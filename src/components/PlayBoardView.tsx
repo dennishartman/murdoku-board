@@ -50,6 +50,10 @@ export function PlayBoardView({
 }: PlayBoardViewProps) {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const activeCells = useMemo(() => board.cells.filter((cell) => cell.isActive).length, [board.cells]);
+  const finalLetters = useMemo(
+    () => new Set(board.cells.map((cell) => cell.finalLetter).filter((letter): letter is string => Boolean(letter))),
+    [board.cells]
+  );
   const boardStyle = {
     gridTemplateColumns: `repeat(${board.cols}, minmax(18px, 1fr))`,
     gridTemplateRows: `repeat(${board.rows}, minmax(18px, 1fr))`,
@@ -197,7 +201,7 @@ export function PlayBoardView({
                 {!isBlocked && !cell.isCrossed && !cell.finalLetter && (
                   <div className="miniSlotGrid" aria-hidden="true">
                     {cell.playMarks.map((mark, index) => (
-                      <span className="miniSlot" key={index}>{mark}</span>
+                      <span className="miniSlot" key={index}>{mark && !finalLetters.has(mark) ? mark : null}</span>
                     ))}
                   </div>
                 )}
