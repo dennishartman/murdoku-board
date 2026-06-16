@@ -272,8 +272,7 @@ export function recalculateRooms(input: BoardGrid): BoardGrid {
       }
     }
 
-    const roomIndex = rooms.length;
-    const id = `room-${roomIndex + 1}`;
+    const id = `room-${rooms.length + 1}`;
     const color = bestOldRoomId ? previousColors.get(bestOldRoomId) ?? DEFAULT_ROOM_COLOR : DEFAULT_ROOM_COLOR;
 
     rooms.push({
@@ -412,16 +411,22 @@ export function toggleCellFinalLetter(input: BoardGrid, row: number, col: number
     return board;
   }
 
+  const removeSelectedLetter = cell.finalLetter === letter;
+
+  for (const otherCell of board.cells) {
+    if (otherCell.finalLetter === letter) {
+      otherCell.finalLetter = null;
+    }
+  }
+
   cell.manualCross = false;
   cell.autoCrossSources = [];
   cell.isCrossed = false;
 
-  if (cell.finalLetter === letter) {
-    cell.finalLetter = null;
-    return recalculateAutoCrosses(board);
+  if (!removeSelectedLetter) {
+    cell.finalLetter = letter;
   }
 
-  cell.finalLetter = letter;
   return recalculateAutoCrosses(board);
 }
 
