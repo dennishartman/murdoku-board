@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { clearCellPlay, DEFAULT_ROOM_COLOR, hasBoundary, PLAY_LETTERS, toggleCellCross, toggleCellFinalLetter, toggleCellLetter } from "../lib/boardModel";
 import type { BoardGrid, PlayToolMode } from "../types/board";
 
@@ -48,6 +48,7 @@ export function PlayBoardView({
   onBoardChange,
   onMainMenu
 }: PlayBoardViewProps) {
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const activeCells = useMemo(() => board.cells.filter((cell) => cell.isActive).length, [board.cells]);
   const boardStyle = {
     gridTemplateColumns: `repeat(${board.cols}, minmax(18px, 1fr))`,
@@ -58,8 +59,29 @@ export function PlayBoardView({
     "--board-rows": board.rows
   } as CSSProperties & Record<string, string | number>;
 
+  useEffect(() => {
+    if (!toastMessage) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setToastMessage(null);
+    }, 1600);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [toastMessage]);
+
   function selectLetter(letter: string) {
     onLetterChange(letter);
+  }
+
+  function showToast(message: string) {
+    setToastMessage(null);
+    window.setTimeout(() => {
+      setToastMessage(message);
+    }, 0);
   }
 
   function handleCellClick(row: number, col: number) {
@@ -69,6 +91,14 @@ export function PlayBoardView({
     }
 
     if (activeTool === "final") {
+      const targetCell = board.cells.find((cell) => cell.row === row && cell.col === col);
+      const selectedLetterAlreadyPlaced = board.cells.some((cell) => cell.finalLetter === selectedLetter && (cell.row !== row || cell.col !== col));
+
+      if (targetCell?.finalLetter !== selectedLetter && selectedLetterAlreadyPlaced) {
+        showToast(`Letter ${selectedLetter} is al geplaatst.`);
+        return;
+      }
+
       onBoardChange(toggleCellFinalLetter(board, row, col, selectedLetter));
       return;
     }
@@ -118,6 +148,8 @@ export function PlayBoardView({
           <button className={activeTool === "erase" ? "playTool active" : "playTool"} type="button" onClick={() => onToolChange("erase")}>Wis</button>
         </div>
       </div>
+
+      {toastMessage && <div className="playToast" role="status">{toastMessage}</div>}
 
       <div className="playBoardWrap">
         <div
