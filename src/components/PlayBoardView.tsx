@@ -60,7 +60,6 @@ export function PlayBoardView({
 
   function selectLetter(letter: string) {
     onLetterChange(letter);
-    onToolChange("letter");
   }
 
   function handleCellClick(row: number, col: number) {
