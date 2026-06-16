@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from "react";
-import { applyBuilderTool, getCell, hasBoundary, ROOM_COLORS, setEdgeBoundary } from "../lib/boardModel";
+import { applyBuilderTool, DEFAULT_ROOM_COLOR, getCell, hasBoundary, ROOM_COLORS, setEdgeBoundary } from "../lib/boardModel";
 import type { BoardGrid, BuilderToolMode, EdgeSide } from "../types/board";
 
 type BoardEditorViewProps = {
@@ -18,12 +18,14 @@ type WallDragState = {
   lineIndex: number | null;
 };
 
+const GRID_LINE_COLOR = "#000000";
+
 function roomColor(board: BoardGrid, roomId: string | null) {
   if (!roomId) {
-    return "#111827";
+    return DEFAULT_ROOM_COLOR;
   }
 
-  return board.rooms.find((room) => room.id === roomId)?.color ?? "#ffffff";
+  return board.rooms.find((room) => room.id === roomId)?.color ?? DEFAULT_ROOM_COLOR;
 }
 
 function wallClass(board: BoardGrid, row: number, col: number, side: EdgeSide) {
@@ -270,10 +272,10 @@ export function BoardEditorView({ board, activeTool, onBoardChange }: BoardEdito
           const cellStyle: CSSProperties = cell.isActive
             ? {
                 backgroundColor: isBlocked ? "#9ca3af" : roomColor(board, cell.roomId),
-                borderTopColor: wallClass(board, cell.row, cell.col, "top") === "roomWall" ? "#111827" : "#94a3b8",
-                borderRightColor: wallClass(board, cell.row, cell.col, "right") === "roomWall" ? "#111827" : "#94a3b8",
-                borderBottomColor: wallClass(board, cell.row, cell.col, "bottom") === "roomWall" ? "#111827" : "#94a3b8",
-                borderLeftColor: wallClass(board, cell.row, cell.col, "left") === "roomWall" ? "#111827" : "#94a3b8",
+                borderTopColor: GRID_LINE_COLOR,
+                borderRightColor: GRID_LINE_COLOR,
+                borderBottomColor: GRID_LINE_COLOR,
+                borderLeftColor: GRID_LINE_COLOR,
                 borderTopWidth: wallClass(board, cell.row, cell.col, "top") === "roomWall" ? 4 : 1,
                 borderRightWidth: wallClass(board, cell.row, cell.col, "right") === "roomWall" ? 4 : 1,
                 borderBottomWidth: wallClass(board, cell.row, cell.col, "bottom") === "roomWall" ? 4 : 1,
