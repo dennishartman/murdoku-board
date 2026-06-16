@@ -14,6 +14,8 @@ export type BoardCell = {
   isBlocked: boolean;
   isObject: boolean;
   isCrossed: boolean;
+  manualCross: boolean;
+  autoCrossSources: string[];
   finalLetter: string | null;
   playMarks: Array<string | null>;
 };
