@@ -1,5 +1,5 @@
 import { useMemo, type CSSProperties } from "react";
-import { clearCellPlay, hasBoundary, PLAY_LETTERS, toggleCellCross, toggleCellFinalLetter, toggleCellLetter } from "../lib/boardModel";
+import { clearCellPlay, DEFAULT_ROOM_COLOR, hasBoundary, PLAY_LETTERS, toggleCellCross, toggleCellFinalLetter, toggleCellLetter } from "../lib/boardModel";
 import type { BoardGrid, PlayToolMode } from "../types/board";
 
 type PlayBoardViewProps = {
@@ -12,12 +12,14 @@ type PlayBoardViewProps = {
   onMainMenu: () => void;
 };
 
+const GRID_LINE_COLOR = "#000000";
+
 function roomColor(board: BoardGrid, roomId: string | null) {
   if (!roomId) {
-    return "#111827";
+    return DEFAULT_ROOM_COLOR;
   }
 
-  return board.rooms.find((room) => room.id === roomId)?.color ?? "#ffffff";
+  return board.rooms.find((room) => room.id === roomId)?.color ?? DEFAULT_ROOM_COLOR;
 }
 
 function wallClass(board: BoardGrid, row: number, col: number, side: "top" | "right" | "bottom" | "left") {
@@ -26,10 +28,10 @@ function wallClass(board: BoardGrid, row: number, col: number, side: "top" | "ri
 
 function cellBorderStyle(board: BoardGrid, row: number, col: number): CSSProperties {
   return {
-    borderTopColor: wallClass(board, row, col, "top") === "roomWall" ? "#111827" : "#94a3b8",
-    borderRightColor: wallClass(board, row, col, "right") === "roomWall" ? "#111827" : "#94a3b8",
-    borderBottomColor: wallClass(board, row, col, "bottom") === "roomWall" ? "#111827" : "#94a3b8",
-    borderLeftColor: wallClass(board, row, col, "left") === "roomWall" ? "#111827" : "#94a3b8",
+    borderTopColor: GRID_LINE_COLOR,
+    borderRightColor: GRID_LINE_COLOR,
+    borderBottomColor: GRID_LINE_COLOR,
+    borderLeftColor: GRID_LINE_COLOR,
     borderTopWidth: wallClass(board, row, col, "top") === "roomWall" ? 4 : 1,
     borderRightWidth: wallClass(board, row, col, "right") === "roomWall" ? 4 : 1,
     borderBottomWidth: wallClass(board, row, col, "bottom") === "roomWall" ? 4 : 1,
