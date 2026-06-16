@@ -1,5 +1,7 @@
 import type { BoardCell, BoardGrid, BoardRoom, BuilderToolMode, EdgeSide } from "../types/board";
 
+export const DEFAULT_ROOM_COLOR = "#e5e7eb";
+
 export const ROOM_COLORS = [
   "#ef4444",
   "#f97316",
@@ -272,7 +274,7 @@ export function recalculateRooms(input: BoardGrid): BoardGrid {
 
     const roomIndex = rooms.length;
     const id = `room-${roomIndex + 1}`;
-    const color = bestOldRoomId ? previousColors.get(bestOldRoomId) ?? ROOM_COLORS[roomIndex % ROOM_COLORS.length] : ROOM_COLORS[roomIndex % ROOM_COLORS.length];
+    const color = bestOldRoomId ? previousColors.get(bestOldRoomId) ?? DEFAULT_ROOM_COLOR : DEFAULT_ROOM_COLOR;
 
     rooms.push({
       id,
