@@ -1,0 +1,42 @@
+.playControls {
+  grid-template-columns: 1fr;
+}
+
+.letterRow {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+}
+
+.letterRow .playTool {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  font-size: clamp(14px, 4vw, 18px);
+}
+
+.playActionRow {
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+}
+
+.playActionRow .playTool {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 420px) {
+  .letterRow {
+    gap: 4px;
+  }
+
+  .letterRow .playTool {
+    min-height: 38px;
+    border-radius: 10px;
+    font-size: 15px;
+  }
+
+  .playActionRow {
+    gap: 6px;
+  }
+}
