@@ -411,22 +411,21 @@ export function toggleCellFinalLetter(input: BoardGrid, row: number, col: number
     return board;
   }
 
-  const removeSelectedLetter = cell.finalLetter === letter;
+  if (cell.finalLetter === letter) {
+    cell.finalLetter = null;
+    return recalculateAutoCrosses(board);
+  }
 
-  for (const otherCell of board.cells) {
-    if (otherCell.finalLetter === letter) {
-      otherCell.finalLetter = null;
-    }
+  const letterAlreadyPlaced = board.cells.some((otherCell) => otherCell !== cell && otherCell.finalLetter === letter);
+
+  if (letterAlreadyPlaced) {
+    return board;
   }
 
   cell.manualCross = false;
   cell.autoCrossSources = [];
   cell.isCrossed = false;
-
-  if (!removeSelectedLetter) {
-    cell.finalLetter = letter;
-  }
-
+  cell.finalLetter = letter;
   return recalculateAutoCrosses(board);
 }
 
