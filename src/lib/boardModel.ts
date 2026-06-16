@@ -22,6 +22,19 @@ function makeEmptyMarks() {
   return Array.from({ length: 9 }, () => null as string | null);
 }
 
+function makeFinalCrossSource(row: number, col: number, letter: string) {
+  return `final:${row}:${col}:${letter}`;
+}
+
+function uniqueSources(sources: string[]) {
+  return Array.from(new Set(sources.filter((source) => typeof source === "string" && source.length > 0)));
+}
+
+function syncCellCross(cell: BoardCell) {
+  cell.autoCrossSources = uniqueSources(cell.autoCrossSources ?? []);
+  cell.isCrossed = cell.manualCross || cell.autoCrossSources.length > 0;
+}
+
 function makeCells(rows: number, cols: number): BoardCell[] {
   const cells: BoardCell[] = [];
 
@@ -35,6 +48,8 @@ function makeCells(rows: number, cols: number): BoardCell[] {
         isBlocked: false,
         isObject: false,
         isCrossed: false,
+        manualCross: false,
+        autoCrossSources: [],
         finalLetter: null,
         playMarks: makeEmptyMarks()
       });
@@ -59,16 +74,23 @@ export function getCell(board: BoardGrid, row: number, col: number) {
 export function normalizeBoard(board: BoardGrid): BoardGrid {
   return {
     ...board,
-    cells: board.cells.map((cell) => ({
-      ...cell,
-      isObject: cell.isObject ?? false,
-      isCrossed: cell.isCrossed ?? false,
-      finalLetter: cell.finalLetter ?? null,
-      playMarks: Array.isArray(cell.playMarks) && cell.playMarks.length === 9 ? [...cell.playMarks] : makeEmptyMarks(),
-      isBlocked: cell.isBlocked ?? false,
-      isActive: cell.isActive ?? true,
-      roomId: cell.roomId ?? null
-    })),
+    cells: board.cells.map((cell) => {
+      const autoCrossSources = Array.isArray(cell.autoCrossSources) ? uniqueSources(cell.autoCrossSources) : [];
+      const manualCross = typeof cell.manualCross === "boolean" ? cell.manualCross : cell.isCrossed ?? false;
+
+      return {
+        ...cell,
+        isObject: cell.isObject ?? false,
+        manualCross,
+        autoCrossSources,
+        isCrossed: manualCross || autoCrossSources.length > 0,
+        finalLetter: cell.finalLetter ?? null,
+        playMarks: Array.isArray(cell.playMarks) && cell.playMarks.length === 9 ? [...cell.playMarks] : makeEmptyMarks(),
+        isBlocked: cell.isBlocked ?? false,
+        isActive: cell.isActive ?? true,
+        roomId: cell.roomId ?? null
+      };
+    }),
     rooms: board.rooms.map((room) => ({ ...room, cells: room.cells.map(([row, col]) => [row, col] as [number, number]) })),
     verticalWalls: board.verticalWalls.map((line) => [...line]),
     horizontalWalls: board.horizontalWalls.map((line) => [...line])
@@ -77,6 +99,42 @@ export function normalizeBoard(board: BoardGrid): BoardGrid {
 
 function cloneBoard(board: BoardGrid): BoardGrid {
   return normalizeBoard(board);
+}
+
+function recalculateAutoCrosses(board: BoardGrid) {
+  for (const cell of board.cells) {
+    cell.autoCrossSources = [];
+  }
+
+  const finalCells = board.cells.filter((cell) => cell.isActive && !cell.isBlocked && cell.finalLetter);
+
+  for (const sourceCell of finalCells) {
+    const source = makeFinalCrossSource(sourceCell.row, sourceCell.col, sourceCell.finalLetter as string);
+
+    for (const targetCell of board.cells) {
+      if (!targetCell.isActive || targetCell.isBlocked) {
+        continue;
+      }
+
+      if (targetCell.row === sourceCell.row && targetCell.col === sourceCell.col) {
+        continue;
+      }
+
+      if (targetCell.finalLetter) {
+        continue;
+      }
+
+      if (targetCell.row === sourceCell.row || targetCell.col === sourceCell.col) {
+        targetCell.autoCrossSources.push(source);
+      }
+    }
+  }
+
+  for (const cell of board.cells) {
+    syncCellCross(cell);
+  }
+
+  return board;
 }
 
 export function createBoard(rows: number, cols: number, referenceImageUrl: string | null): BoardGrid {
@@ -230,7 +288,7 @@ export function recalculateRooms(input: BoardGrid): BoardGrid {
   }
 
   board.rooms = rooms;
-  return board;
+  return recalculateAutoCrosses(board);
 }
 
 export function toggleCellActive(input: BoardGrid, row: number, col: number) {
@@ -240,6 +298,8 @@ export function toggleCellActive(input: BoardGrid, row: number, col: number) {
   cell.isBlocked = false;
   cell.isObject = false;
   cell.isCrossed = false;
+  cell.manualCross = false;
+  cell.autoCrossSources = [];
   cell.finalLetter = null;
   cell.playMarks = makeEmptyMarks();
   return recalculateRooms(board);
@@ -303,9 +363,11 @@ export function applyBuilderTool(input: BoardGrid, row: number, col: number, too
       cell.isObject = false;
     }
     cell.isCrossed = false;
+    cell.manualCross = false;
+    cell.autoCrossSources = [];
     cell.finalLetter = null;
     cell.playMarks = makeEmptyMarks();
-    return board;
+    return recalculateAutoCrosses(board);
   }
 
   return board;
@@ -319,7 +381,8 @@ export function toggleCellCross(input: BoardGrid, row: number, col: number) {
     return board;
   }
 
-  cell.isCrossed = !cell.isCrossed;
+  cell.manualCross = !cell.manualCross;
+  syncCellCross(cell);
   return board;
 }
 
@@ -331,10 +394,12 @@ export function clearCellPlay(input: BoardGrid, row: number, col: number) {
     return board;
   }
 
+  cell.manualCross = false;
+  cell.autoCrossSources = [];
   cell.isCrossed = false;
   cell.finalLetter = null;
   cell.playMarks = makeEmptyMarks();
-  return board;
+  return recalculateAutoCrosses(board);
 }
 
 export function toggleCellFinalLetter(input: BoardGrid, row: number, col: number, letter: string) {
@@ -345,15 +410,17 @@ export function toggleCellFinalLetter(input: BoardGrid, row: number, col: number
     return board;
   }
 
+  cell.manualCross = false;
+  cell.autoCrossSources = [];
   cell.isCrossed = false;
 
   if (cell.finalLetter === letter) {
     cell.finalLetter = null;
-    return board;
+    return recalculateAutoCrosses(board);
   }
 
   cell.finalLetter = letter;
-  return board;
+  return recalculateAutoCrosses(board);
 }
 
 export function toggleCellLetter(input: BoardGrid, row: number, col: number, letter: string) {
@@ -377,7 +444,8 @@ export function toggleCellLetter(input: BoardGrid, row: number, col: number, let
     return board;
   }
 
-  cell.isCrossed = false;
+  cell.manualCross = false;
+  syncCellCross(cell);
   cell.playMarks[emptySlot] = letter;
   return board;
 }
