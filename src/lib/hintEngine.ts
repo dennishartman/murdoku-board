@@ -46,10 +46,6 @@ function describeRoom(board: BoardGrid, roomId: string) {
   return roomId;
 }
 
-function edgeLabel(edgeType: Hint["type"] extends "edge" ? never : string) {
-  return edgeType;
-}
-
 function describeEdge(edgeType: "any_edge" | "top" | "right" | "bottom" | "left" | "corner") {
   if (edgeType === "corner") {
     return "in een hoek van het bord";
