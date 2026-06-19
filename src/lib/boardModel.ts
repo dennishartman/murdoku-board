@@ -1,4 +1,4 @@
-import { DEFAULT_THEME_ID, createActiveCharacterSet, ensureActiveCharacterSet } from "./characterPool";
+import { DEFAULT_THEME_ID, createActiveCharacterSet, ensureActiveCharacterSet, makeActiveLettersForCharacterCount } from "./characterPool";
 import type { BoardCell, BoardGrid, BoardRoom, BuilderToolMode, EdgeSide, PlayLetter } from "../types/board";
 
 export const DEFAULT_ROOM_COLOR = "#e5e7eb";
@@ -70,39 +70,98 @@ function makeHorizontalWalls(rows: number, cols: number) {
   return Array.from({ length: rows + 1 }, (_, row) => Array.from({ length: cols }, () => row === 0 || row === rows));
 }
 
+function calculateActiveLetters(rows: number, cols: number, cells: BoardCell[]) {
+  const activeRows = new Set<number>();
+  const activeCols = new Set<number>();
+
+  for (const cell of cells) {
+    if (!cell.isActive) {
+      continue;
+    }
+
+    activeRows.add(cell.row);
+    activeCols.add(cell.col);
+  }
+
+  const rowCount = activeRows.size || rows;
+  const colCount = activeCols.size || cols;
+  const maxCharacters = Math.max(1, Math.min(rowCount, colCount, PLAY_LETTERS.length));
+
+  return makeActiveLettersForCharacterCount(maxCharacters);
+}
+
+function normalizeActiveLetters(rows: number, cols: number, cells: BoardCell[], current?: PlayLetter[] | null) {
+  const calculated = calculateActiveLetters(rows, cols, cells);
+  const calculatedSet = new Set(calculated);
+
+  if (!Array.isArray(current) || current.length === 0) {
+    return calculated;
+  }
+
+  const filtered = current.filter((letter): letter is PlayLetter => PLAY_LETTERS.includes(letter as PlayLetter) && calculatedSet.has(letter as PlayLetter));
+
+  if (!filtered.includes("V")) {
+    filtered.push("V");
+  }
+
+  return filtered.length > 0 ? filtered : calculated;
+}
+
+function sanitizePlayLetters(board: BoardGrid) {
+  const activeLetterSet = new Set(board.activeLetters);
+
+  for (const cell of board.cells) {
+    if (cell.finalLetter && !activeLetterSet.has(cell.finalLetter as PlayLetter)) {
+      cell.finalLetter = null;
+    }
+
+    cell.playMarks = cell.playMarks.map((mark) => (mark && activeLetterSet.has(mark as PlayLetter) ? mark : null));
+  }
+
+  return board;
+}
+
+function isActivePlayLetter(board: BoardGrid, letter: string) {
+  return board.activeLetters.includes(letter as PlayLetter);
+}
+
 export function getCell(board: BoardGrid, row: number, col: number) {
   return board.cells[row * board.cols + col];
 }
 
 export function normalizeBoard(board: BoardGrid): BoardGrid {
   const selectedThemeId = board.selectedThemeId ?? DEFAULT_THEME_ID;
+  const normalizedCells = board.cells.map((cell) => {
+    const autoCrossSources = Array.isArray(cell.autoCrossSources) ? uniqueSources(cell.autoCrossSources) : [];
+    const manualCross = typeof cell.manualCross === "boolean" ? cell.manualCross : cell.isCrossed ?? false;
 
-  return {
+    return {
+      ...cell,
+      isObject: cell.isObject ?? false,
+      manualCross,
+      autoCrossSources,
+      isCrossed: manualCross || autoCrossSources.length > 0,
+      finalLetter: cell.finalLetter ?? null,
+      playMarks: Array.isArray(cell.playMarks) && cell.playMarks.length === 9 ? [...cell.playMarks] : makeEmptyMarks(),
+      isBlocked: cell.isBlocked ?? false,
+      isActive: cell.isActive ?? true,
+      roomId: cell.roomId ?? null
+    };
+  });
+
+  const normalizedBoard: BoardGrid = {
     ...board,
     selectedThemeId,
+    activeLetters: normalizeActiveLetters(board.rows, board.cols, normalizedCells, board.activeLetters),
     activeCharacters: ensureActiveCharacterSet(selectedThemeId, board.activeCharacters),
     hints: Array.isArray(board.hints) ? [...board.hints] : [],
-    cells: board.cells.map((cell) => {
-      const autoCrossSources = Array.isArray(cell.autoCrossSources) ? uniqueSources(cell.autoCrossSources) : [];
-      const manualCross = typeof cell.manualCross === "boolean" ? cell.manualCross : cell.isCrossed ?? false;
-
-      return {
-        ...cell,
-        isObject: cell.isObject ?? false,
-        manualCross,
-        autoCrossSources,
-        isCrossed: manualCross || autoCrossSources.length > 0,
-        finalLetter: cell.finalLetter ?? null,
-        playMarks: Array.isArray(cell.playMarks) && cell.playMarks.length === 9 ? [...cell.playMarks] : makeEmptyMarks(),
-        isBlocked: cell.isBlocked ?? false,
-        isActive: cell.isActive ?? true,
-        roomId: cell.roomId ?? null
-      };
-    }),
+    cells: normalizedCells,
     rooms: (board.rooms ?? []).map((room) => ({ ...room, cells: room.cells.map(([row, col]) => [row, col] as [number, number]) })),
     verticalWalls: board.verticalWalls.map((line) => [...line]),
     horizontalWalls: board.horizontalWalls.map((line) => [...line])
   };
+
+  return sanitizePlayLetters(normalizedBoard);
 }
 
 function cloneBoard(board: BoardGrid): BoardGrid {
@@ -110,6 +169,8 @@ function cloneBoard(board: BoardGrid): BoardGrid {
 }
 
 function recalculateAutoCrosses(board: BoardGrid) {
+  sanitizePlayLetters(board);
+
   for (const cell of board.cells) {
     cell.autoCrossSources = [];
   }
@@ -147,15 +208,18 @@ function recalculateAutoCrosses(board: BoardGrid) {
 
 export function createBoard(rows: number, cols: number, referenceImageUrl: string | null): BoardGrid {
   const selectedThemeId = DEFAULT_THEME_ID;
+  const cells = makeCells(rows, cols);
+  const activeLetters = calculateActiveLetters(rows, cols, cells);
   const board: BoardGrid = {
     rows,
     cols,
-    cells: makeCells(rows, cols),
+    cells,
     rooms: [],
     verticalWalls: makeVerticalWalls(rows, cols),
     horizontalWalls: makeHorizontalWalls(rows, cols),
     referenceImageUrl,
     selectedThemeId,
+    activeLetters,
     activeCharacters: createActiveCharacterSet(selectedThemeId),
     hints: []
   };
@@ -299,6 +363,7 @@ export function recalculateRooms(input: BoardGrid): BoardGrid {
   }
 
   board.rooms = rooms;
+  board.activeLetters = calculateActiveLetters(board.rows, board.cols, board.cells);
   return recalculateAutoCrosses(board);
 }
 
@@ -417,7 +482,7 @@ export function toggleCellFinalLetter(input: BoardGrid, row: number, col: number
   const board = cloneBoard(input);
   const cell = getCell(board, row, col);
 
-  if (!cell.isActive || cell.isBlocked) {
+  if (!cell.isActive || cell.isBlocked || !isActivePlayLetter(board, letter)) {
     return board;
   }
 
@@ -426,9 +491,21 @@ export function toggleCellFinalLetter(input: BoardGrid, row: number, col: number
     return recalculateAutoCrosses(board);
   }
 
+  if (cell.isCrossed) {
+    return board;
+  }
+
   const letterAlreadyPlaced = board.cells.some((otherCell) => otherCell !== cell && otherCell.finalLetter === letter);
 
   if (letterAlreadyPlaced) {
+    return board;
+  }
+
+  const rowOrColumnAlreadyHasFinal = board.cells.some(
+    (otherCell) => otherCell !== cell && Boolean(otherCell.finalLetter) && (otherCell.row === row || otherCell.col === col)
+  );
+
+  if (rowOrColumnAlreadyHasFinal) {
     return board;
   }
 
@@ -443,7 +520,7 @@ export function toggleCellLetter(input: BoardGrid, row: number, col: number, let
   const board = cloneBoard(input);
   const cell = getCell(board, row, col);
 
-  if (!cell.isActive || cell.isBlocked) {
+  if (!cell.isActive || cell.isBlocked || cell.isCrossed || !isActivePlayLetter(board, letter)) {
     return board;
   }
 
