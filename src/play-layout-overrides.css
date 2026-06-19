@@ -148,6 +148,101 @@
   color: #020617;
 }
 
+.selectionPanel {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 14px;
+  padding: 12px;
+  border-radius: 18px;
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.tokenGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.roomTokenGrid {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.selectionToken {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 2px solid rgba(148, 163, 184, 0.24);
+  border-radius: 14px;
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.82);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.activeSelectionToken {
+  color: #052e16;
+  background: #bbf7d0;
+  border-color: #86efac;
+}
+
+.tokenColor {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+}
+
+.roomNameLabel {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: block;
+  color: rgba(15, 23, 42, 0.82);
+  font-size: clamp(7px, 1.45vw, 11px);
+  font-weight: 1000;
+  line-height: 1;
+  text-align: left;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.38);
+  pointer-events: none;
+}
+
+.objectMarker,
+.obstacleMarker {
+  position: absolute;
+  inset: auto 9% 9% 9%;
+  z-index: 2;
+  min-height: 22%;
+  display: grid;
+  place-items: center;
+  padding: 2px 3px;
+  border-radius: 8px;
+  color: #020617;
+  font-size: clamp(7px, 1.5vw, 11px);
+  font-weight: 1000;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+}
+
+.objectMarker {
+  border: 2px solid rgba(15, 23, 42, 0.84);
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.obstacleMarker {
+  border: 2px solid rgba(248, 250, 252, 0.86);
+  background: rgba(15, 23, 42, 0.72);
+  color: #f8fafc;
+}
+
 .solutionOverlayTip {
   color: #dbeafe;
   background: rgba(30, 64, 175, 0.25);
@@ -324,5 +419,10 @@
   .solutionMarker {
     inset: 14%;
     font-size: clamp(15px, 7vw, 28px);
+  }
+
+  .tokenGrid,
+  .roomTokenGrid {
+    grid-template-columns: repeat(auto-fit, minmax(94px, 1fr));
   }
 }
