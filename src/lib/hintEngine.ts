@@ -59,32 +59,6 @@ function describeSubject(subject: HintSubject, activeCharacters: ActiveCharacter
   return `Een ${genderSingular[subject.gender]}`;
 }
 
-function describeTarget(target: HintTarget, activeCharacters: ActiveCharacterSet) {
-  if (target.kind === "character") {
-    return activeCharacters[target.letter]?.name ?? target.letter;
-  }
-
-  if (target.kind === "gender") {
-    return `een ${genderSingular[target.gender]}`;
-  }
-
-  if (target.kind === "object") {
-    if (target.objectType) {
-      const name = getObjectDefinition(target.objectType)?.name.toLowerCase() ?? "object";
-      return `${objectArticle[target.objectType]} ${name}`;
-    }
-
-    return "een object";
-  }
-
-  if (target.obstacleType) {
-    const name = getObstacleDefinition(target.obstacleType)?.name.toLowerCase() ?? "obstakel";
-    return `${obstacleArticle[target.obstacleType]} ${name}`;
-  }
-
-  return "een obstakel";
-}
-
 function describeRoom(board: BoardGrid, roomId: string) {
   const room = board.rooms.find((candidate) => candidate.id === roomId);
 
@@ -99,6 +73,40 @@ function describeRoom(board: BoardGrid, roomId: string) {
   }
 
   return roomId;
+}
+
+function describeTargetRoom(board: BoardGrid, roomId: string | null | undefined) {
+  if (!roomId) {
+    return "";
+  }
+
+  return ` in ${describeRoom(board, roomId)}`;
+}
+
+function describeTarget(target: HintTarget, activeCharacters: ActiveCharacterSet, board: BoardGrid) {
+  if (target.kind === "character") {
+    return activeCharacters[target.letter]?.name ?? target.letter;
+  }
+
+  if (target.kind === "gender") {
+    return `een ${genderSingular[target.gender]}`;
+  }
+
+  if (target.kind === "object") {
+    if (target.objectType) {
+      const name = getObjectDefinition(target.objectType)?.name.toLowerCase() ?? "object";
+      return `${objectArticle[target.objectType]} ${name}${describeTargetRoom(board, target.roomId)}`;
+    }
+
+    return "een object";
+  }
+
+  if (target.obstacleType) {
+    const name = getObstacleDefinition(target.obstacleType)?.name.toLowerCase() ?? "obstakel";
+    return `${obstacleArticle[target.obstacleType]} ${name}${describeTargetRoom(board, target.roomId)}`;
+  }
+
+  return "een obstakel";
 }
 
 function describeEdge(edgeType: "any_edge" | "top" | "right" | "bottom" | "left" | "corner") {
@@ -192,12 +200,12 @@ export function describeHint(hint: Hint, board: BoardGrid, activeCharacters: Act
 
   if (hint.type === "adjacent") {
     const relationText = hint.relation === "is" ? "staat naast" : "staat niet naast";
-    return `${describeSubject(hint.subject, activeCharacters)} ${relationText} ${describeTarget(hint.target, activeCharacters)}.`;
+    return `${describeSubject(hint.subject, activeCharacters)} ${relationText} ${describeTarget(hint.target, activeCharacters, board)}.`;
   }
 
   if (hint.type === "diagonal") {
     const relationText = hint.relation === "is" ? "staat diagonaal van" : "staat niet diagonaal van";
-    return `${describeSubject(hint.subject, activeCharacters)} ${relationText} ${describeTarget(hint.target, activeCharacters)}.`;
+    return `${describeSubject(hint.subject, activeCharacters)} ${relationText} ${describeTarget(hint.target, activeCharacters, board)}.`;
   }
 
   if (hint.type === "edge") {
@@ -206,12 +214,12 @@ export function describeHint(hint: Hint, board: BoardGrid, activeCharacters: Act
   }
 
   if (hint.type === "distance") {
-    return `${describeSubject(hint.subject, activeCharacters)} staat ${describeDistanceRelation(hint.relation)} ${hint.distance} ${describeAxis(hint.axis, hint.distance)} van ${describeTarget(hint.target, activeCharacters)}.`;
+    return `${describeSubject(hint.subject, activeCharacters)} staat ${describeDistanceRelation(hint.relation)} ${hint.distance} ${describeAxis(hint.axis, hint.distance)} van ${describeTarget(hint.target, activeCharacters, board)}.`;
   }
 
   if (hint.type === "direction") {
     const relationText = hint.relation === "is" ? "staat" : "staat niet";
-    return `${describeSubject(hint.subject, activeCharacters)} ${relationText} ${describeDirection(hint.direction)} ${describeTarget(hint.target, activeCharacters)}.`;
+    return `${describeSubject(hint.subject, activeCharacters)} ${relationText} ${describeDirection(hint.direction)} ${describeTarget(hint.target, activeCharacters, board)}.`;
   }
 
   if (hint.type === "room_group_count") {
