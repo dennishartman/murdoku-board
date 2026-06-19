@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from "react";
 import { applyBuilderTool, DEFAULT_ROOM_COLOR, getCell, hasBoundary, ROOM_COLORS, setEdgeBoundary } from "../lib/boardModel";
-import type { BoardGrid, BuilderToolMode, EdgeSide } from "../types/board";
+import type { BoardGrid, BuilderToolMode, EdgeSide, PlayLetter } from "../types/board";
 
 type BoardEditorViewProps = {
   board: BoardGrid;
   activeTool: BuilderToolMode;
+  showSolution?: boolean;
   onBoardChange: (board: BoardGrid) => void;
 };
 
@@ -104,7 +105,23 @@ function edgeButtonFromPoint(clientX: number, clientY: number) {
   };
 }
 
-export function BoardEditorView({ board, activeTool, onBoardChange }: BoardEditorViewProps) {
+function getSolutionLetter(board: BoardGrid, row: number, col: number): PlayLetter | null {
+  if (!board.solution) {
+    return null;
+  }
+
+  for (const letter of board.activeLetters) {
+    const position = board.solution[letter];
+
+    if (position?.row === row && position.col === col) {
+      return letter;
+    }
+  }
+
+  return null;
+}
+
+export function BoardEditorView({ board, activeTool, showSolution = false, onBoardChange }: BoardEditorViewProps) {
   const [selectedColor, setSelectedColor] = useState(ROOM_COLORS[0]);
   const activeCells = useMemo(() => board.cells.filter((cell) => cell.isActive).length, [board.cells]);
   const latestBoardRef = useRef(board);
@@ -255,6 +272,12 @@ export function BoardEditorView({ board, activeTool, onBoardChange }: BoardEdito
         </div>
       )}
 
+      {showSolution && board.solution && (
+        <div className="tipBox solutionOverlayTip">
+          Oplossing wordt op het bord getoond. Elke blauwe marker is een verborgen positie.
+        </div>
+      )}
+
       <div
         className="manualBoard editorBoard"
         style={{
@@ -269,6 +292,7 @@ export function BoardEditorView({ board, activeTool, onBoardChange }: BoardEdito
         {board.cells.map((cell) => {
           const isBlocked = cell.isActive && cell.isBlocked;
           const isObject = cell.isActive && cell.isObject;
+          const solutionLetter = showSolution && cell.isActive ? getSolutionLetter(board, cell.row, cell.col) : null;
           const cellStyle: CSSProperties = cell.isActive
             ? {
                 backgroundColor: isBlocked ? "#9ca3af" : roomColor(board, cell.roomId),
@@ -283,7 +307,13 @@ export function BoardEditorView({ board, activeTool, onBoardChange }: BoardEdito
               }
             : {};
 
-          const className = ["manualCell", cell.isActive ? "" : "inactiveCell", isBlocked ? "blockedCell" : "", isObject ? "objectCell" : ""].filter(Boolean).join(" ");
+          const className = [
+            "manualCell",
+            cell.isActive ? "" : "inactiveCell",
+            isBlocked ? "blockedCell" : "",
+            isObject ? "objectCell" : "",
+            solutionLetter ? "solutionCell" : ""
+          ].filter(Boolean).join(" ");
 
           return (
             <div
@@ -300,6 +330,11 @@ export function BoardEditorView({ board, activeTool, onBoardChange }: BoardEdito
               }}
             >
               {isObject && <span className="objectMarker" />}
+              {solutionLetter && (
+                <span className="solutionMarker" title={`Oplossing ${solutionLetter}`}>
+                  {solutionLetter}
+                </span>
+              )}
               {cell.isActive && activeTool === "wall" && (
                 <>
                   <button
