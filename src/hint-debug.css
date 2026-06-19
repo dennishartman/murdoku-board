@@ -11,6 +11,69 @@
   flex: 1 1 auto;
 }
 
+.hintDebugText {
+  display: grid;
+  gap: 12px;
+  max-height: 390px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.hintTextGroup {
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.hintTextGroup h3 {
+  margin: 0 0 6px;
+  color: #fef3c7;
+  font-size: 15px;
+}
+
+.hintTextGroup p {
+  margin: 0;
+  color: #e2e8f0;
+  line-height: 1.65;
+}
+
+.hintInlineItem {
+  display: inline;
+  min-height: 0;
+  margin: 0 5px 4px 0;
+  padding: 3px 7px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 10px;
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.82);
+  cursor: pointer;
+  text-align: left;
+  line-height: 1.5;
+}
+
+.hintInlineItem strong {
+  margin-right: 4px;
+  color: #fbbf24;
+  font-weight: 1000;
+}
+
+.hintInlineItem:hover,
+.hintInlineItem:focus-visible {
+  border-color: rgba(251, 191, 36, 0.82);
+  outline: none;
+}
+
+.activeHintInlineItem {
+  border-color: #86efac;
+  color: #dcfce7;
+  background: rgba(20, 83, 45, 0.72);
+}
+
+.activeHintInlineItem strong {
+  color: #86efac;
+}
+
 .hintDebugList {
   display: grid;
   gap: 8px;
@@ -137,6 +200,7 @@
     width: 100%;
   }
 
+  .hintDebugText,
   .hintDebugList {
     max-height: 280px;
   }
