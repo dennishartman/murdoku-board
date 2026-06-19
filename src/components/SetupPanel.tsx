@@ -1,11 +1,14 @@
 import { useRef } from "react";
+import type { PuzzleDifficulty } from "../types/board";
 
 type SetupPanelProps = {
   rows: number;
   cols: number;
+  difficulty: PuzzleDifficulty;
   referenceImageUrl: string | null;
   onRowsChange: (value: number) => void;
   onColsChange: (value: number) => void;
+  onDifficultyChange: (value: PuzzleDifficulty) => void;
   onReferenceImageChange: (value: string | null) => void;
   onCreateBoard: () => void;
   onLoadSaved: () => void;
@@ -24,9 +27,11 @@ function numberOptions(min: number, max: number) {
 export function SetupPanel({
   rows,
   cols,
+  difficulty,
   referenceImageUrl,
   onRowsChange,
   onColsChange,
+  onDifficultyChange,
   onReferenceImageChange,
   onCreateBoard,
   onLoadSaved
@@ -53,7 +58,7 @@ export function SetupPanel({
         </div>
       </div>
 
-      <div className="formGrid">
+      <div className="formGrid setupGrid">
         <label>
           Rijen
           <select value={rows} onChange={(event) => onRowsChange(Number(event.target.value))}>
@@ -71,6 +76,20 @@ export function SetupPanel({
             ))}
           </select>
         </label>
+
+        <label>
+          Moeilijkheid
+          <select value={difficulty} onChange={(event) => onDifficultyChange(event.target.value as PuzzleDifficulty)}>
+            <option value="easy">Makkelijk</option>
+            <option value="normal">Normaal</option>
+            <option value="hard">Moeilijk</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="instructionBox compactInfoBox">
+        <strong>Personages</strong>
+        <p>De kaart bepaalt het maximum. De moeilijkheid bepaalt hoeveel verdachten meedoen, altijd samen met 1 slachtoffer.</p>
       </div>
 
       <div className="buttonRow">
