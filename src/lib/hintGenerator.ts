@@ -1,8 +1,6 @@
 import type {
   BoardCell,
   BoardGrid,
-  BoardObjectTypeId,
-  BoardObstacleTypeId,
   BoardSolution,
   Hint,
   HintSubject,
@@ -81,6 +79,26 @@ function makeObjectTarget(cell: BoardCell): HintTarget | null {
   }
 
   return null;
+}
+
+function hintSubjectLetter(hint: Hint) {
+  if (hint.type === "murderer_room") {
+    return hint.victimLetter;
+  }
+
+  if (hint.type === "room_person_count") {
+    return null;
+  }
+
+  if (hint.type === "room_group_count") {
+    return hint.subject?.kind === "character" ? hint.subject.letter : null;
+  }
+
+  return hint.subject.kind === "character" ? hint.subject.letter : null;
+}
+
+function hintCoversLetter(hint: Hint, letter: PlayLetter) {
+  return hintSubjectLetter(hint) === letter;
 }
 
 function uniqueHints(hints: Hint[]) {
