@@ -62,8 +62,8 @@ export type HintSubject =
 export type HintTarget =
   | { kind: "character"; letter: PlayLetter }
   | { kind: "gender"; gender: CharacterGender }
-  | { kind: "object"; objectType?: BoardObjectTypeId }
-  | { kind: "obstacle"; obstacleType?: BoardObstacleTypeId };
+  | { kind: "object"; objectType?: BoardObjectTypeId; roomId?: string | null }
+  | { kind: "obstacle"; obstacleType?: BoardObstacleTypeId; roomId?: string | null };
 
 export type MurdererRoomHint = {
   id: string;
