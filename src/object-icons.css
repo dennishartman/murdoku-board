@@ -23,23 +23,19 @@
 
 .objectTokenIcon,
 .obstacleTokenIcon {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
-  padding: 3px;
-  border-radius: 11px;
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.26), rgba(15, 23, 42, 0.36));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.46), 0 5px 12px rgba(0, 0, 0, 0.22);
-}
-
-.obstacleTokenIcon {
-  background: linear-gradient(180deg, rgba(254, 226, 226, 0.3), rgba(127, 29, 29, 0.3));
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .activeSelectionToken .objectTokenIcon,
 .activeSelectionToken .obstacleTokenIcon {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(134, 239, 172, 0.4));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 0 0 2px rgba(5, 46, 22, 0.42), 0 8px 16px rgba(0, 0, 0, 0.2);
+  background: transparent;
+  box-shadow: none;
 }
 
 .objectMarker,
@@ -50,61 +46,38 @@
   z-index: 2;
   display: grid;
   place-items: center;
-  padding: 3px;
-  border: 2px solid rgba(15, 23, 42, 0.84);
-  border-radius: 13px;
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(226, 232, 240, 0.82));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78), inset 0 -6px 12px rgba(15, 23, 42, 0.08), 0 7px 16px rgba(15, 23, 42, 0.2);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   pointer-events: none;
 }
 
 .objectMarker,
-.playObjectMarker {
-  inset: auto 8% 7% 8%;
-  min-height: 36%;
-}
-
+.playObjectMarker,
 .obstacleMarker,
 .playObstacleMarker {
-  inset: 9%;
+  inset: 7%;
   min-height: 0;
-  border-color: rgba(69, 26, 3, 0.84);
-  background: linear-gradient(180deg, rgba(254, 243, 199, 0.95), rgba(180, 83, 9, 0.82));
 }
 
 .objectMarker::after,
 .obstacleMarker::after,
 .playObjectMarker::after,
 .playObstacleMarker::after {
-  content: "";
-  position: absolute;
-  inset: 3px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.38);
-  pointer-events: none;
+  display: none;
 }
 
 .objectMarker .decorIcon,
-.playObjectMarker .decorIcon {
-  width: clamp(28px, 74%, 48px);
-  height: clamp(28px, 74%, 48px);
-  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.58));
-}
-
+.playObjectMarker .decorIcon,
 .obstacleMarker .decorIcon,
 .playObstacleMarker .decorIcon {
-  width: clamp(32px, 86%, 56px);
-  height: clamp(32px, 86%, 56px);
-  filter: drop-shadow(0 2px 2px rgba(15, 23, 42, 0.22));
-}
-
-.playObjectMarker {
-  inset: auto 10% 8% 10%;
-  min-height: 34%;
-}
-
-.playObstacleMarker {
-  inset: 8%;
+  width: 100%;
+  height: 100%;
+  max-width: 96px;
+  max-height: 96px;
+  filter: drop-shadow(0 4px 5px rgba(15, 23, 42, 0.28));
 }
 
 .objectCell .miniSlotGrid,
