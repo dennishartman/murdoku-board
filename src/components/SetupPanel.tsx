@@ -1,42 +1,26 @@
 import { useRef } from "react";
+import { getBoardSizeRangeLabel } from "../lib/boardModel";
 import type { PuzzleDifficulty } from "../types/board";
 
 type SetupPanelProps = {
-  rows: number;
-  cols: number;
   difficulty: PuzzleDifficulty;
   referenceImageUrl: string | null;
-  onRowsChange: (value: number) => void;
-  onColsChange: (value: number) => void;
   onDifficultyChange: (value: PuzzleDifficulty) => void;
   onReferenceImageChange: (value: string | null) => void;
   onCreateBoard: () => void;
   onLoadSaved: () => void;
 };
 
-function numberOptions(min: number, max: number) {
-  const options = [];
-
-  for (let value = min; value <= max; value += 1) {
-    options.push(value);
-  }
-
-  return options;
-}
-
 export function SetupPanel({
-  rows,
-  cols,
   difficulty,
   referenceImageUrl,
-  onRowsChange,
-  onColsChange,
   onDifficultyChange,
   onReferenceImageChange,
   onCreateBoard,
   onLoadSaved
 }: SetupPanelProps) {
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const sizeRange = getBoardSizeRangeLabel(difficulty);
 
   function handleFileSelected(file: File | undefined) {
     if (!file) {
@@ -53,30 +37,12 @@ export function SetupPanel({
       <div className="sectionTitle">
         <span>1</span>
         <div>
-          <h2>Maak leeg basisgrid</h2>
-          <p>Kies eerst hoeveel rijen en kolommen het maximale bordgebied heeft. Daarna verwijder je de cellen die buiten de echte bordvorm vallen.</p>
+          <h2>Maak een nieuw bord</h2>
+          <p>Kies de moeilijkheid. De app kiest daarna automatisch een passende vierkante bordgrootte en hetzelfde aantal personages.</p>
         </div>
       </div>
 
-      <div className="formGrid setupGrid">
-        <label>
-          Rijen
-          <select value={rows} onChange={(event) => onRowsChange(Number(event.target.value))}>
-            {numberOptions(4, 18).map((value) => (
-              <option value={value} key={value}>{value}</option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          Kolommen
-          <select value={cols} onChange={(event) => onColsChange(Number(event.target.value))}>
-            {numberOptions(4, 18).map((value) => (
-              <option value={value} key={value}>{value}</option>
-            ))}
-          </select>
-        </label>
-
+      <div className="formGrid setupGrid singleSetupGrid">
         <label>
           Moeilijkheid
           <select value={difficulty} onChange={(event) => onDifficultyChange(event.target.value as PuzzleDifficulty)}>
@@ -88,8 +54,8 @@ export function SetupPanel({
       </div>
 
       <div className="instructionBox compactInfoBox">
-        <strong>Personages</strong>
-        <p>De kaart bepaalt het maximum. De moeilijkheid bepaalt hoeveel verdachten meedoen, altijd samen met 1 slachtoffer.</p>
+        <strong>Formaat en personages</strong>
+        <p>Voor deze moeilijkheid wordt een bord gekozen van {sizeRange}. Elke rij en elke kolom krijgt uiteindelijk precies 1 personage.</p>
       </div>
 
       <div className="buttonRow">
