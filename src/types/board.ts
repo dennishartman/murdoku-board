@@ -71,6 +71,13 @@ export type MurdererRoomHint = {
   victimLetter: PlayLetter;
 };
 
+export type RoomPersonCountHint = {
+  id: string;
+  type: "room_person_count";
+  roomId: string;
+  count: number;
+};
+
 export type RowColumnHint = {
   id: string;
   type: "row_column";
@@ -144,7 +151,17 @@ export type RoomGroupCountHint = {
   count: number;
 };
 
-export type Hint = MurdererRoomHint | RowColumnHint | RoomHint | AdjacentHint | DiagonalHint | EdgeHint | DistanceHint | DirectionHint | RoomGroupCountHint;
+export type Hint =
+  | MurdererRoomHint
+  | RoomPersonCountHint
+  | RowColumnHint
+  | RoomHint
+  | AdjacentHint
+  | DiagonalHint
+  | EdgeHint
+  | DistanceHint
+  | DirectionHint
+  | RoomGroupCountHint;
 
 export type BoardCell = {
   row: number;
