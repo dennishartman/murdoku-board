@@ -142,6 +142,11 @@ function describeAxis(axis: "row" | "col" | "either", distance: number) {
 }
 
 export function describeHint(hint: Hint, board: BoardGrid, activeCharacters: ActiveCharacterSet) {
+  if (hint.type === "murderer_room") {
+    const victimName = activeCharacters[hint.victimLetter]?.name ?? hint.victimLetter;
+    return `${victimName} stond met de moordenaar in dezelfde kamer.`;
+  }
+
   if (hint.type === "row_column") {
     const axisLabel = hint.axis === "row" ? "rij" : "kolom";
     const relationText = hint.relation === "is" ? "bevindt zich in" : "bevindt zich niet in";
