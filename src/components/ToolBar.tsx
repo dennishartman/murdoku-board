@@ -17,8 +17,8 @@ type ToolBarProps = {
 const tools: Array<{ id: BuilderToolMode; label: string; help: string }> = [
   { id: "shape", label: "Vorm", help: "Cellen aan of uit zetten" },
   { id: "wall", label: "Rand", help: "Kamerlijnen tekenen" },
-  { id: "color", label: "Kleur", help: "Kamerkleur kiezen" },
-  { id: "object", label: "Object", help: "Beschikbaar object" },
+  { id: "color", label: "Kamer", help: "Kamernaam kiezen" },
+  { id: "object", label: "Object", help: "Object voor hints" },
   { id: "blocked", label: "Stop", help: "Obstakel of stopcel" }
 ];
 
