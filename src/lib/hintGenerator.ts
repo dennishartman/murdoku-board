@@ -53,24 +53,6 @@ type GenerateHintsResult =
 
 const CANDIDATE_LIMIT = 8000;
 
-function uniqueHints(hints: Hint[]) {
-  const seen = new Set<string>();
-  const result: Hint[] = [];
-
-  for (const hint of hints) {
-    const key = JSON.stringify(hint);
-
-    if (seen.has(key)) {
-      continue;
-    }
-
-    seen.add(key);
-    result.push(hint);
-  }
-
-  return result;
-}
-
 function getCell(board: BoardGrid, row: number, col: number) {
   return board.cells.find((cell) => cell.row === row && cell.col === col) ?? null;
 }
@@ -87,6 +69,70 @@ function getPosition(solution: BoardSolution, letter: PlayLetter) {
   return solution[letter];
 }
 
+function makePosition(row: number, col: number): SolutionPosition {
+  return { row, col };
+}
+
+function isCorner(board: BoardGrid, position: SolutionPosition) {
+  return (position.row === 0 || position.row === board.rows - 1) && (position.col === 0 || position.col === board.cols - 1);
+}
+
+function isEdge(board: BoardGrid, position: SolutionPosition) {
+  return position.row === 0 || position.col === 0 || position.row === board.rows - 1 || position.col === board.cols - 1;
+}
+
+function isAdjacent(a: SolutionPosition, b: SolutionPosition) {
+  return Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1;
+}
+
+function isDiagonal(a: SolutionPosition, b: SolutionPosition) {
+  return Math.abs(a.row - b.row) === 1 && Math.abs(a.col - b.col) === 1;
+}
+
+function distanceByAxis(a: SolutionPosition, b: SolutionPosition, axis: "row" | "col" | "either") {
+  if (axis === "row") {
+    return Math.abs(a.row - b.row);
+  }
+
+  if (axis === "col") {
+    return Math.abs(a.col - b.col);
+  }
+
+  return Math.abs(a.row - b.row) + Math.abs(a.col - b.col);
+}
+
+function compareDistance(actual: number, expected: number, relation: "exactly" | "not_exactly" | "at_least" | "at_most") {
+  if (relation === "not_exactly") {
+    return actual !== expected;
+  }
+
+  if (relation === "at_least") {
+    return actual >= expected;
+  }
+
+  if (relation === "at_most") {
+    return actual <= expected;
+  }
+
+  return actual === expected;
+}
+
+function uniqueHints(hints: Hint[]) {
+  const seen = new Set<string>();
+  const result: Hint[] = [];
+
+  for (const hint of hints) {
+    const key = JSON.stringify(hint);
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(hint);
+    }
+  }
+
+  return result;
+}
+
 function getSolutionPositions(board: BoardGrid, solution: BoardSolution | null = board.solution) {
   if (!solution) {
     return [];
@@ -95,7 +141,7 @@ function getSolutionPositions(board: BoardGrid, solution: BoardSolution | null =
   const result: PositionedLetter[] = [];
 
   for (const letter of board.activeLetters) {
-    const position: SolutionPosition | undefined = solution[letter];
+    const position = getPosition(solution, letter);
 
     if (!position) {
       continue;
@@ -112,27 +158,7 @@ function getSolutionPositions(board: BoardGrid, solution: BoardSolution | null =
   return result;
 }
 
-function isCorner(board: BoardGrid, row: number, col: number) {
-  return (row === 0 || row === board.rows - 1) && (col === 0 || col === board.cols - 1);
-}
-
-function isEdge(board: BoardGrid, row: number, col: number) {
-  return row === 0 || col === 0 || row === board.rows - 1 || col === board.cols - 1;
-}
-
-function relationDistance(a: PositionedLetter, b: TargetCell) {
-  return Math.abs(a.row - b.row) + Math.abs(a.col - b.col);
-}
-
-function isAdjacent(a: PositionedLetter, b: TargetCell) {
-  return relationDistance(a, b) === 1;
-}
-
-function isDiagonal(a: PositionedLetter, b: TargetCell) {
-  return Math.abs(a.row - b.row) === 1 && Math.abs(a.col - b.col) === 1;
-}
-
-function getTargets(board: BoardGrid): TargetCell[] {
+function getTargets(board: BoardGrid) {
   const result: TargetCell[] = [];
 
   for (const cell of board.cells) {
@@ -208,7 +234,7 @@ function makeSolutionKey(board: BoardGrid, solution: BoardSolution) {
     .join("|");
 }
 
-function makeCandidateSolution(board: BoardGrid, solution: BoardSolution): CandidateSolution | null {
+function makeCandidateSolution(board: BoardGrid, solution: BoardSolution) {
   const usedRows = new Set<number>();
   const usedCols = new Set<number>();
 
@@ -237,7 +263,7 @@ function makeCandidateSolution(board: BoardGrid, solution: BoardSolution): Candi
     solution: { ...solution },
     murdererLetter,
     key: makeSolutionKey(board, solution)
-  };
+  } satisfies CandidateSolution;
 }
 
 function shouldPrunePartial(board: BoardGrid, solution: BoardSolution) {
@@ -247,16 +273,16 @@ function shouldPrunePartial(board: BoardGrid, solution: BoardSolution) {
     return false;
   }
 
-  const placedSuspectsInVictimRoom = board.activeLetters.filter((letter) => {
+  const suspectsInVictimRoom = board.activeLetters.filter((letter) => {
     if (letter === "V") {
       return false;
     }
 
     const position = getPosition(solution, letter);
-    return position && getCellRoomId(board, position) === victimRoomId;
+    return Boolean(position && getCellRoomId(board, position) === victimRoomId);
   });
 
-  return placedSuspectsInVictimRoom.length > 1;
+  return suspectsInVictimRoom.length > 1;
 }
 
 function enumerateCandidateSolutions(board: BoardGrid, limit = CANDIDATE_LIMIT): CandidateResult {
@@ -289,8 +315,8 @@ function enumerateCandidateSolutions(board: BoardGrid, limit = CANDIDATE_LIMIT):
     return { candidates, capped };
   }
 
-  const orderedLetters = ["V", ...board.activeLetters.filter((letter) => letter !== "V")] as PlayLetter[];
-  const solution: BoardSolution = {};
+  const orderedLetters: PlayLetter[] = ["V", ...board.activeLetters.filter((letter) => letter !== "V")];
+  const workingSolution: BoardSolution = {};
   const usedRows = new Set<number>();
   const usedCols = new Set<number>();
 
@@ -301,26 +327,30 @@ function enumerateCandidateSolutions(board: BoardGrid, limit = CANDIDATE_LIMIT):
     }
 
     if (index >= orderedLetters.length) {
-      addCandidate(solution);
+      addCandidate(workingSolution);
       return;
     }
 
     const letter = orderedLetters[index];
+
+    if (!letter) {
+      return;
+    }
 
     for (const cell of validCells) {
       if (usedRows.has(cell.row) || usedCols.has(cell.col)) {
         continue;
       }
 
-      solution[letter] = { row: cell.row, col: cell.col };
+      workingSolution[letter] = makePosition(cell.row, cell.col);
       usedRows.add(cell.row);
       usedCols.add(cell.col);
 
-      if (!shouldPrunePartial(board, solution)) {
+      if (!shouldPrunePartial(board, workingSolution)) {
         backtrack(index + 1);
       }
 
-      delete solution[letter];
+      delete workingSolution[letter];
       usedRows.delete(cell.row);
       usedCols.delete(cell.col);
 
@@ -331,7 +361,6 @@ function enumerateCandidateSolutions(board: BoardGrid, limit = CANDIDATE_LIMIT):
   }
 
   backtrack(0);
-
   return { candidates, capped };
 }
 
@@ -363,12 +392,12 @@ function positionsForTarget(board: BoardGrid, candidate: CandidateSolution, targ
   if (target.kind === "object") {
     return board.cells
       .filter((cell) => cell.isActive && cell.isObject && (!target.objectType || cell.objectType === target.objectType))
-      .map((cell) => ({ row: cell.row, col: cell.col }));
+      .map((cell) => makePosition(cell.row, cell.col));
   }
 
   return board.cells
     .filter((cell) => cell.isActive && cell.isBlocked && (!target.obstacleType || cell.obstacleType === target.obstacleType))
-    .map((cell) => ({ row: cell.row, col: cell.col }));
+    .map((cell) => makePosition(cell.row, cell.col));
 }
 
 function evaluatePairHint(
@@ -383,34 +412,6 @@ function evaluatePairHint(
   const targetPositions = positionsForTarget(board, candidate, target);
   const hasMatch = subjectPositions.some((subjectPosition) => targetPositions.some((targetPosition) => predicate(subjectPosition, targetPosition)));
   return relation === "is" ? hasMatch : !hasMatch;
-}
-
-function compareDistance(actual: number, expected: number, relation: "exactly" | "not_exactly" | "at_least" | "at_most") {
-  if (relation === "not_exactly") {
-    return actual !== expected;
-  }
-
-  if (relation === "at_least") {
-    return actual >= expected;
-  }
-
-  if (relation === "at_most") {
-    return actual <= expected;
-  }
-
-  return actual === expected;
-}
-
-function distanceByAxis(subjectPosition: SolutionPosition, targetPosition: SolutionPosition, axis: "row" | "col" | "either") {
-  if (axis === "row") {
-    return Math.abs(subjectPosition.row - targetPosition.row);
-  }
-
-  if (axis === "col") {
-    return Math.abs(subjectPosition.col - targetPosition.col);
-  }
-
-  return Math.abs(subjectPosition.row - targetPosition.row) + Math.abs(subjectPosition.col - targetPosition.col);
 }
 
 function evaluateHintForCandidate(board: BoardGrid, candidate: CandidateSolution, hint: Hint) {
@@ -432,22 +433,18 @@ function evaluateHintForCandidate(board: BoardGrid, candidate: CandidateSolution
   }
 
   if (hint.type === "adjacent") {
-    return evaluatePairHint(board, candidate, hint.subject, hint.target, hint.relation, (subjectPosition, targetPosition) => {
-      return Math.abs(subjectPosition.row - targetPosition.row) + Math.abs(subjectPosition.col - targetPosition.col) === 1;
-    });
+    return evaluatePairHint(board, candidate, hint.subject, hint.target, hint.relation, isAdjacent);
   }
 
   if (hint.type === "diagonal") {
-    return evaluatePairHint(board, candidate, hint.subject, hint.target, hint.relation, (subjectPosition, targetPosition) => {
-      return Math.abs(subjectPosition.row - targetPosition.row) === 1 && Math.abs(subjectPosition.col - targetPosition.col) === 1;
-    });
+    return evaluatePairHint(board, candidate, hint.subject, hint.target, hint.relation, isDiagonal);
   }
 
   if (hint.type === "edge") {
     const subjectPositions = positionsForSubject(board, candidate, hint.subject);
     const hasMatch = subjectPositions.some((position) => {
       if (hint.edgeType === "corner") {
-        return isCorner(board, position.row, position.col);
+        return isCorner(board, position);
       }
 
       if (hint.edgeType === "top") {
@@ -466,7 +463,7 @@ function evaluateHintForCandidate(board: BoardGrid, candidate: CandidateSolution
         return position.col === 0;
       }
 
-      return isEdge(board, position.row, position.col);
+      return isEdge(board, position);
     });
 
     return hint.relation === "is" ? hasMatch : !hasMatch;
@@ -474,7 +471,8 @@ function evaluateHintForCandidate(board: BoardGrid, candidate: CandidateSolution
 
   if (hint.type === "distance") {
     return evaluatePairHint(board, candidate, hint.subject, hint.target, "is", (subjectPosition, targetPosition) => {
-      return compareDistance(distanceByAxis(subjectPosition, targetPosition, hint.axis), hint.distance, hint.relation);
+      const actual = distanceByAxis(subjectPosition, targetPosition, hint.axis);
+      return compareDistance(actual, hint.distance, hint.relation);
     });
   }
 
@@ -497,18 +495,17 @@ function evaluateHintForCandidate(board: BoardGrid, candidate: CandidateSolution
   }
 
   if (hint.type === "room_group_count") {
-    const lettersInRoom = board.activeLetters.filter((letter) => {
-      return getCellRoomId(board, getPosition(candidate.solution, letter)) === hint.roomId;
-    });
+    const lettersInRoom = board.activeLetters.filter((letter) => getCellRoomId(board, getPosition(candidate.solution, letter)) === hint.roomId);
     const matchingLetters = lettersInRoom.filter((letter) => board.activeCharacters[letter]?.gender === hint.group.gender);
 
     if (!hint.subject || hint.countMode === "total") {
       return matchingLetters.length === hint.count;
     }
 
-    const subjectLetters = hint.subject.kind === "character"
-      ? [hint.subject.letter]
-      : board.activeLetters.filter((letter) => board.activeCharacters[letter]?.gender === hint.subject?.gender);
+    const subject = hint.subject;
+    const subjectLetters: PlayLetter[] = subject.kind === "character"
+      ? [subject.letter]
+      : board.activeLetters.filter((letter) => board.activeCharacters[letter]?.gender === subject.gender);
     const subjectIsInRoom = subjectLetters.some((letter) => lettersInRoom.includes(letter));
 
     if (!subjectIsInRoom) {
@@ -583,7 +580,9 @@ function addRowColumnHints(positions: PositionedLetter[], hints: Hint[]) {
 
 function addEdgeHints(board: BoardGrid, positions: PositionedLetter[], hints: Hint[]) {
   for (const position of positions) {
-    if (isCorner(board, position.row, position.col)) {
+    const candidatePosition = makePosition(position.row, position.col);
+
+    if (isCorner(board, candidatePosition)) {
       hints.push({
         id: `corner-${position.letter}`,
         type: "edge",
@@ -594,7 +593,7 @@ function addEdgeHints(board: BoardGrid, positions: PositionedLetter[], hints: Hi
       continue;
     }
 
-    if (isEdge(board, position.row, position.col)) {
+    if (isEdge(board, candidatePosition)) {
       hints.push({
         id: `edge-${position.letter}`,
         type: "edge",
@@ -616,8 +615,12 @@ function addEdgeHints(board: BoardGrid, positions: PositionedLetter[], hints: Hi
 
 function addTargetHints(positions: PositionedLetter[], targets: TargetCell[], hints: Hint[]) {
   for (const position of positions) {
+    const positionValue = makePosition(position.row, position.col);
+
     for (const target of targets) {
-      if (isAdjacent(position, target)) {
+      const targetPosition = makePosition(target.row, target.col);
+
+      if (isAdjacent(positionValue, targetPosition)) {
         hints.push({
           id: `adjacent-${position.letter}-${target.row}-${target.col}-${target.target.kind}`,
           type: "adjacent",
@@ -627,7 +630,7 @@ function addTargetHints(positions: PositionedLetter[], targets: TargetCell[], hi
         });
       }
 
-      if (isDiagonal(position, target)) {
+      if (isDiagonal(positionValue, targetPosition)) {
         hints.push({
           id: `diagonal-${position.letter}-${target.row}-${target.col}-${target.target.kind}`,
           type: "diagonal",
@@ -687,7 +690,7 @@ function addCharacterGenderRoomHints(board: BoardGrid, positions: PositionedLett
       continue;
     }
 
-    const gender = board.activeCharacters[position.letter]?.gender;
+    const gender: CharacterGender | undefined = board.activeCharacters[position.letter]?.gender;
 
     if (!gender) {
       continue;
@@ -800,8 +803,8 @@ function hintPriority(board: BoardGrid, hint: Hint) {
   return 6;
 }
 
-function bestNonReducingHint(board: BoardGrid, letter: PlayLetter, candidates: Hint[], usedHintIds: Set<string>) {
-  const options = candidates
+function bestNonReducingHint(board: BoardGrid, letter: PlayLetter, hintCandidates: Hint[], usedHintIds: Set<string>) {
+  const options = hintCandidates
     .filter((hint) => hintSubjectLetter(hint) === letter && hint.type !== "murderer_room" && !usedHintIds.has(hint.id))
     .sort((a, b) => hintPriority(board, a) - hintPriority(board, b) || a.id.localeCompare(b.id));
 
@@ -963,9 +966,9 @@ export function generateBetaHints(board: BoardGrid): GenerateHintsResult {
     };
   }
 
-  const candidates = generateHintCandidates(board);
+  const hintCandidates = generateHintCandidates(board);
 
-  if (candidates.length === 0) {
+  if (hintCandidates.length === 0) {
     return {
       ok: false,
       hints: [],
@@ -974,7 +977,7 @@ export function generateBetaHints(board: BoardGrid): GenerateHintsResult {
     };
   }
 
-  const selection = selectBetaHints(board, candidates, candidateResult.candidates);
+  const selection = selectBetaHints(board, hintCandidates, candidateResult.candidates);
 
   if (!selection.ok) {
     return {
