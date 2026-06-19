@@ -379,7 +379,7 @@ function selectBetaHints(board: BoardGrid, candidates: Hint[]) {
     }
   }
 
-  const buckets = [
+  const buckets: Hint[][] = [
     softHints.filter((hint) => hint.type === "room"),
     softHints.filter((hint) => hint.type === "adjacent" || hint.type === "diagonal"),
     softHints.filter((hint) => hint.type === "edge"),
