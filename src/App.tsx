@@ -25,8 +25,8 @@ export function App() {
     setBoard(newBoard);
     setMode("edit");
     setActiveBuilderTool("shape");
-    setSelectedLetter(PLAY_LETTERS[0]);
-    setStatus("Basisgrid gemaakt. Gebruik Vorm om cellen buiten het bord weg te halen.");
+    setSelectedLetter(newBoard.activeLetters[0] ?? PLAY_LETTERS[0]);
+    setStatus(`Basisgrid gemaakt met ${newBoard.activeLetters.length - 1} verdachten en 1 slachtoffer. Gebruik Vorm om cellen buiten het bord weg te halen.`);
   }
 
   async function handleSave() {
@@ -58,7 +58,7 @@ export function App() {
     setReferenceImageUrl(loadedBoard.referenceImageUrl);
     setMode("edit");
     setActiveBuilderTool("shape");
-    setSelectedLetter(PLAY_LETTERS[0]);
+    setSelectedLetter(loadedBoard.activeLetters[0] ?? PLAY_LETTERS[0]);
     setStatus(`Bord geladen: ${saved.name}.`);
   }
 
@@ -76,7 +76,9 @@ export function App() {
       return;
     }
 
-    setBoard(normalizeBoard(board));
+    const normalizedBoard = normalizeBoard(board);
+    setBoard(normalizedBoard);
+    setSelectedLetter(normalizedBoard.activeLetters[0] ?? PLAY_LETTERS[0]);
     setMode("play");
     setActivePlayTool("letter");
     setStatus("Speelmodus geopend. Kies een personage, kies Aantekening of Plaatsen en tik daarna op een cel.");
@@ -97,6 +99,8 @@ export function App() {
   }
 
   const activeCells = board?.cells.filter((cell) => cell.isActive).length ?? 0;
+  const personCount = board?.activeLetters.length ?? 0;
+  const suspectCount = personCount > 0 ? Math.max(0, personCount - 1) : 0;
 
   return (
     <main className={mode === "play" ? "appShell playShell" : "appShell"}>
@@ -118,7 +122,7 @@ export function App() {
             <span>1</span>
             <div>
               <h2>Huidig bord</h2>
-              <p>{activeCells} actieve cellen en {board.rooms.length} kamers.</p>
+              <p>{activeCells} actieve cellen, {board.rooms.length} kamers, {suspectCount} verdachten en 1 slachtoffer.</p>
             </div>
           </div>
 
