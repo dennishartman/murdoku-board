@@ -220,7 +220,7 @@ export function App() {
                 <span>3</span>
                 <div>
                   <h2>Verborgen oplossing</h2>
-                  <p>Debugweergave voor het testen. Dit wordt later verborgen voor spelers.</p>
+                  <p>Debugweergave voor het testen. Dezelfde letters worden ook op het bord geprojecteerd.</p>
                 </div>
               </div>
 
@@ -237,7 +237,7 @@ export function App() {
             </section>
           )}
 
-          <BoardEditorView board={board} activeTool={activeBuilderTool} onBoardChange={handleBoardChange} />
+          <BoardEditorView board={board} activeTool={activeBuilderTool} showSolution={showSolution} onBoardChange={handleBoardChange} />
         </>
       )}
 
