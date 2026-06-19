@@ -25,6 +25,7 @@ export function App() {
     setBoard(newBoard);
     setMode("edit");
     setActiveBuilderTool("shape");
+    setSelectedLetter(PLAY_LETTERS[0]);
     setStatus("Basisgrid gemaakt. Gebruik Vorm om cellen buiten het bord weg te halen.");
   }
 
@@ -57,6 +58,7 @@ export function App() {
     setReferenceImageUrl(loadedBoard.referenceImageUrl);
     setMode("edit");
     setActiveBuilderTool("shape");
+    setSelectedLetter(PLAY_LETTERS[0]);
     setStatus(`Bord geladen: ${saved.name}.`);
   }
 
@@ -65,6 +67,7 @@ export function App() {
     setMode("setup");
     setActiveBuilderTool("shape");
     setActivePlayTool("letter");
+    setSelectedLetter(PLAY_LETTERS[0]);
     setStatus("Maak een nieuw basisgrid of laad een opgeslagen bord.");
   }
 
@@ -73,9 +76,10 @@ export function App() {
       return;
     }
 
+    setBoard(normalizeBoard(board));
     setMode("play");
     setActivePlayTool("letter");
-    setStatus("Speelmodus geopend. Kies een letter, kies Mogelijk of Definitief en tik daarna op een cel.");
+    setStatus("Speelmodus geopend. Kies een personage, kies Aantekening of Plaatsen en tik daarna op een cel.");
   }
 
   function handleEditCurrentBoard() {
