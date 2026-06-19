@@ -1,5 +1,5 @@
 import { getObjectDefinition, getObstacleDefinition } from "./themeContent";
-import type { ActiveCharacterSet, BoardGrid, CharacterGender, Hint, HintSubject, HintTarget } from "../types/board";
+import type { ActiveCharacterSet, BoardGrid, BoardObjectTypeId, BoardObstacleTypeId, CharacterGender, Hint, HintSubject, HintTarget } from "../types/board";
 
 const genderSingular: Record<CharacterGender, string> = {
   male: "man",
@@ -13,8 +13,34 @@ const genderPlural: Record<CharacterGender, string> = {
   neutral: "personen"
 };
 
+const objectArticle: Record<BoardObjectTypeId, string> = {
+  chair: "de",
+  bed: "het",
+  bookcase: "de",
+  painting: "het",
+  safe: "de",
+  clock: "de",
+  statue: "het",
+  candle: "de"
+};
+
+const obstacleArticle: Record<BoardObstacleTypeId, string> = {
+  table: "de",
+  plant: "de",
+  hedge: "de",
+  cabinet: "de",
+  piano: "de",
+  crate: "het",
+  fireplace: "de",
+  locked_door: "de"
+};
+
 function genderLabel(gender: CharacterGender, count = 2) {
   return count === 1 ? genderSingular[gender] : genderPlural[gender];
+}
+
+function personLabel(count: number) {
+  return count === 1 ? "personage" : "personages";
 }
 
 function lowerFirst(value: string) {
@@ -44,14 +70,16 @@ function describeTarget(target: HintTarget, activeCharacters: ActiveCharacterSet
 
   if (target.kind === "object") {
     if (target.objectType) {
-      return `de ${getObjectDefinition(target.objectType)?.name.toLowerCase() ?? "object"}`;
+      const name = getObjectDefinition(target.objectType)?.name.toLowerCase() ?? "object";
+      return `${objectArticle[target.objectType]} ${name}`;
     }
 
     return "een object";
   }
 
   if (target.obstacleType) {
-    return `de ${getObstacleDefinition(target.obstacleType)?.name.toLowerCase() ?? "obstakel"}`;
+    const name = getObstacleDefinition(target.obstacleType)?.name.toLowerCase() ?? "obstakel";
+    return `${obstacleArticle[target.obstacleType]} ${name}`;
   }
 
   return "een obstakel";
@@ -145,6 +173,10 @@ export function describeHint(hint: Hint, board: BoardGrid, activeCharacters: Act
   if (hint.type === "murderer_room") {
     const victimName = activeCharacters[hint.victimLetter]?.name ?? hint.victimLetter;
     return `${victimName} stond met de moordenaar in dezelfde kamer.`;
+  }
+
+  if (hint.type === "room_person_count") {
+    return `In ${describeRoom(board, hint.roomId)} staan ${hint.count} ${personLabel(hint.count)}.`;
   }
 
   if (hint.type === "row_column") {
