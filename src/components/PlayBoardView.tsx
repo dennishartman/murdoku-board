@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { clearCellPlay, DEFAULT_ROOM_COLOR, hasBoundary, PLAY_LETTERS, toggleCellCross, toggleCellFinalLetter, toggleCellLetter } from "../lib/boardModel";
 import { ensureActiveCharacterSet } from "../lib/characterPool";
 import { describeHints } from "../lib/hintEngine";
-import type { BoardGrid, PlayToolMode } from "../types/board";
+import type { BoardGrid, PlayLetter, PlayToolMode } from "../types/board";
 
 type PlayBoardViewProps = {
   board: BoardGrid;
@@ -104,6 +104,8 @@ export function PlayBoardView({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [hintsOpen, setHintsOpen] = useState(false);
   const activeCells = useMemo(() => board.cells.filter((cell) => cell.isActive).length, [board.cells]);
+  const activeLetters = useMemo(() => (board.activeLetters.length > 0 ? board.activeLetters : PLAY_LETTERS), [board.activeLetters]);
+  const suspectCount = Math.max(0, activeLetters.length - 1);
   const activeCharacters = useMemo(() => ensureActiveCharacterSet(board.selectedThemeId, board.activeCharacters), [board.selectedThemeId, board.activeCharacters]);
   const finalLetters = useMemo(
     () => new Set(board.cells.map((cell) => cell.finalLetter).filter((letter): letter is string => Boolean(letter))),
@@ -118,6 +120,15 @@ export function PlayBoardView({
     "--board-cols": board.cols,
     "--board-rows": board.rows
   } as CSSProperties & Record<string, string | number>;
+  const characterRowStyle = { "--character-count": activeLetters.length } as CSSProperties & Record<string, number>;
+
+  useEffect(() => {
+    if (activeLetters.includes(selectedLetter as PlayLetter)) {
+      return;
+    }
+
+    onLetterChange(activeLetters[0] ?? "V");
+  }, [activeLetters, selectedLetter, onLetterChange]);
 
   useEffect(() => {
     if (!toastMessage) {
@@ -163,6 +174,11 @@ export function PlayBoardView({
         (cell) => Boolean(cell.finalLetter) && (cell.row !== row || cell.col !== col) && (cell.row === row || cell.col === col)
       );
 
+      if (!activeLetters.includes(selectedLetter as PlayLetter)) {
+        showToast("Dit personage doet niet mee in dit bord.");
+        return;
+      }
+
       if (!isRemovingSameLetter && selectedLetterAlreadyPlaced) {
         showToast(`Letter ${selectedLetter} is al geplaatst.`);
         return;
@@ -196,9 +212,9 @@ export function PlayBoardView({
     <section className="playScreen">
       <div className="playHeader">
         <div>
-          <p className="eyebrow compactEyebrow">Speelmodus beta</p>
+          <p className="eyebrow compactEyebrow">Speelmodus beta 2</p>
           <h2>Vul het bord in</h2>
-          <p>{activeCells} actieve cellen. Kies een personage, kies Aantekening of Plaatsen en tik daarna op een cel.</p>
+          <p>{activeCells} actieve cellen. {suspectCount} verdachten en 1 slachtoffer. Kies een personage en tik daarna op een cel.</p>
         </div>
 
         <div className="playHeaderButtons">
@@ -266,8 +282,8 @@ export function PlayBoardView({
       </div>
 
       <div className="playControls">
-        <div className="characterRow" aria-label="Personages">
-          {PLAY_LETTERS.map((letter) => {
+        <div className="characterRow" style={characterRowStyle} aria-label="Personages">
+          {activeLetters.map((letter) => {
             const character = activeCharacters[letter];
             const portraitStyle = { "--character-accent": character.accentColor } as CSSProperties & Record<string, string>;
 
@@ -281,6 +297,7 @@ export function PlayBoardView({
               >
                 <span className="characterPortrait" style={portraitStyle} />
                 <span className="characterName">{character.name}</span>
+                <span className={character.role === "victim" ? "characterRole victimRole" : "characterRole"}>{character.role === "victim" ? "Slachtoffer" : "Verdachte"}</span>
               </button>
             );
           })}
