@@ -44,6 +44,13 @@ export type ActiveCharacter = {
 
 export type ActiveCharacterSet = Record<PlayLetter, ActiveCharacter>;
 
+export type SolutionPosition = {
+  row: number;
+  col: number;
+};
+
+export type BoardSolution = Partial<Record<PlayLetter, SolutionPosition>>;
+
 export type HintSubject =
   | { kind: "character"; letter: PlayLetter }
   | { kind: "gender"; gender: CharacterGender };
@@ -161,6 +168,7 @@ export type BoardGrid = {
   maxCharacters: number;
   activeLetters: PlayLetter[];
   activeCharacters: ActiveCharacterSet;
+  solution: BoardSolution | null;
   hints: Hint[];
 };
 
