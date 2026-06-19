@@ -56,10 +56,6 @@ function isDiagonal(a: SolutionPosition, b: SolutionPosition) {
   return Math.abs(a.row - b.row) === 1 && Math.abs(a.col - b.col) === 1;
 }
 
-function manhattanDistance(a: SolutionPosition, b: SolutionPosition) {
-  return Math.abs(a.row - b.row) + Math.abs(a.col - b.col);
-}
-
 function makeSubject(letter: PlayLetter): HintSubject {
   return { kind: "character", letter };
 }
@@ -316,10 +312,7 @@ function filterDomainByHint(board: BoardGrid, letter: PlayLetter, domain: Soluti
   }
 
   if (hint.type === "distance" && hint.subject.kind === "character" && hint.subject.letter === letter && (hint.target.kind === "object" || hint.target.kind === "obstacle")) {
-    return domain.filter((position) => {
-      const isMatch = distanceToTargetCells(board, position, hint.target, hint.axis, hint.distance, hint.relation);
-      return isMatch;
-    });
+    return domain.filter((position) => distanceToTargetCells(board, position, hint.target, hint.axis, hint.distance, hint.relation));
   }
 
   return domain;
@@ -367,11 +360,7 @@ function evaluateBinaryHint(hint: Hint, assignment: SolverAssignment) {
     return hint.relation === "is" ? isMatch : !isMatch;
   }
 
-  if (hint.type === "distance") {
-    return distanceMatches(subjectPosition, targetPosition, hint.axis, hint.distance, hint.relation);
-  }
-
-  return true;
+  return distanceMatches(subjectPosition, targetPosition, hint.axis, hint.distance, hint.relation);
 }
 
 function evaluateFinalHint(board: BoardGrid, hint: Hint, assignment: SolverAssignment) {
@@ -529,7 +518,7 @@ function getAnchorCells(board: BoardGrid, includeObstacles: boolean) {
 }
 
 function sortAnchorsByDistance(position: SolutionPosition, anchors: BoardCell[]) {
-  return [...anchors].sort((a, b) => manhattanDistance(position, { row: a.row, col: a.col }) - manhattanDistance(position, { row: b.row, col: b.col }));
+  return [...anchors].sort((a, b) => Math.abs(position.row - a.row) + Math.abs(position.col - a.col) - (Math.abs(position.row - b.row) + Math.abs(position.col - b.col)));
 }
 
 function addObjectPlacementHint(board: BoardGrid, hints: Hint[], letter: PlayLetter, position: SolutionPosition, includeObstacles: boolean) {
@@ -587,40 +576,36 @@ function getPersonRelationCandidates(board: BoardGrid) {
       }
 
       const targetHint = makeCharacterTarget(target);
+      const direction = directionForSameLine(subjectPosition, targetPosition);
 
       if (isAdjacent(subjectPosition, targetPosition)) {
         result.push({ hint: { id: `person-adjacent-${subject}-${target}`, type: "adjacent", subject: makeSubject(subject), target: targetHint, relation: "is" }, subject, target, score: 0 });
+      } else {
+        result.push({ hint: { id: `person-not-adjacent-${subject}-${target}`, type: "adjacent", subject: makeSubject(subject), target: targetHint, relation: "is_not" }, subject, target, score: 4 });
       }
 
       if (isDiagonal(subjectPosition, targetPosition)) {
         result.push({ hint: { id: `person-diagonal-${subject}-${target}`, type: "diagonal", subject: makeSubject(subject), target: targetHint, relation: "is" }, subject, target, score: 1 });
+      } else {
+        result.push({ hint: { id: `person-not-diagonal-${subject}-${target}`, type: "diagonal", subject: makeSubject(subject), target: targetHint, relation: "is_not" }, subject, target, score: 5 });
       }
-
-      const direction = directionForSameLine(subjectPosition, targetPosition);
 
       if (direction) {
         result.push({ hint: { id: `person-direction-${subject}-${target}-${direction}`, type: "direction", subject: makeSubject(subject), target: targetHint, direction, relation: "is" }, subject, target, score: 2 });
       }
-
-      result.push({
-        hint: { id: `person-distance-${subject}-${target}`, type: "distance", subject: makeSubject(subject), target: targetHint, axis: "either", distance: manhattanDistance(subjectPosition, targetPosition), relation: "exactly" },
-        subject,
-        target,
-        score: 3
-      });
     }
   }
 
   return result.sort((a, b) => a.score - b.score || a.subject.localeCompare(b.subject) || a.target.localeCompare(b.target));
 }
 
-function addRelativePersonHint(board: BoardGrid, hints: Hint[], letter: PlayLetter, position: SolutionPosition) {
+function addRelativePersonHint(board: BoardGrid, hints: Hint[], letter: PlayLetter) {
   if (letter === "V") {
     return false;
   }
 
   return getPersonRelationCandidates(board)
-    .filter((candidate) => candidate.subject === letter && candidate.hint.type !== "distance" || candidate.subject === letter && candidate.score === 3 && position)
+    .filter((candidate) => candidate.subject === letter)
     .some((candidate) => addHint(hints, candidate.hint));
 }
 
@@ -632,7 +617,7 @@ function getDependencyChainLength(hints: Hint[]) {
   const graph = new Map<PlayLetter, PlayLetter[]>();
 
   for (const hint of hints) {
-    if (hint.type !== "adjacent" && hint.type !== "diagonal" && hint.type !== "direction" && hint.type !== "distance") {
+    if (hint.type !== "adjacent" && hint.type !== "diagonal" && hint.type !== "direction") {
       continue;
     }
 
@@ -976,7 +961,7 @@ function buildEasyHints(board: BoardGrid, hints: Hint[], directHintsByLetter: Ma
     }
 
     addObjectPlacementHint(board, hints, letter, position, includeObstacles);
-    addRelativePersonHint(board, hints, letter, position);
+    addRelativePersonHint(board, hints, letter);
     addPreferredDirectHint(board, hints, directHintsByLetter, letter, index);
   });
 }
@@ -1072,7 +1057,7 @@ export function generateHintCandidates(board: BoardGrid) {
     }
 
     addObjectPlacementHint(board, hints, letter, position, includeObstacles);
-    addRelativePersonHint(board, hints, letter, position);
+    addRelativePersonHint(board, hints, letter);
 
     if (board.difficulty !== "hard" || index < HARD_MAX_DIRECTLY_SOLVABLE) {
       addPreferredDirectHint(board, hints, directHintsByLetter, letter, index);
