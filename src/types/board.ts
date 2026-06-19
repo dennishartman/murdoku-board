@@ -65,6 +65,12 @@ export type HintTarget =
   | { kind: "object"; objectType?: BoardObjectTypeId }
   | { kind: "obstacle"; obstacleType?: BoardObstacleTypeId };
 
+export type MurdererRoomHint = {
+  id: string;
+  type: "murderer_room";
+  victimLetter: PlayLetter;
+};
+
 export type RowColumnHint = {
   id: string;
   type: "row_column";
@@ -138,7 +144,7 @@ export type RoomGroupCountHint = {
   count: number;
 };
 
-export type Hint = RowColumnHint | RoomHint | AdjacentHint | DiagonalHint | EdgeHint | DistanceHint | DirectionHint | RoomGroupCountHint;
+export type Hint = MurdererRoomHint | RowColumnHint | RoomHint | AdjacentHint | DiagonalHint | EdgeHint | DistanceHint | DirectionHint | RoomGroupCountHint;
 
 export type BoardCell = {
   row: number;
