@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { clearCellPlay, DEFAULT_ROOM_COLOR, hasBoundary, PLAY_LETTERS, toggleCellCross, toggleCellFinalLetter, toggleCellLetter } from "../lib/boardModel";
+import { ensureActiveCharacterSet } from "../lib/characterPool";
+import { describeHints } from "../lib/hintEngine";
 import type { BoardGrid, PlayToolMode } from "../types/board";
 
 type PlayBoardViewProps = {
@@ -12,7 +14,22 @@ type PlayBoardViewProps = {
   onMainMenu: () => void;
 };
 
+type PlayActionIconName = "pencil" | "check" | "cross" | "eraser";
+
+type PlayAction = {
+  mode: PlayToolMode;
+  label: string;
+  icon: PlayActionIconName;
+};
+
 const GRID_LINE_COLOR = "#000000";
+
+const PLAY_ACTIONS: PlayAction[] = [
+  { mode: "letter", label: "Aantekening", icon: "pencil" },
+  { mode: "final", label: "Plaatsen", icon: "check" },
+  { mode: "cross", label: "Kruis", icon: "cross" },
+  { mode: "erase", label: "Wissen", icon: "eraser" }
+];
 
 function roomColor(board: BoardGrid, roomId: string | null) {
   if (!roomId) {
@@ -39,6 +56,42 @@ function cellBorderStyle(board: BoardGrid, row: number, col: number): CSSPropert
   };
 }
 
+function PlayActionIcon({ icon }: { icon: PlayActionIconName }) {
+  if (icon === "pencil") {
+    return (
+      <svg className="playToolIcon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 17.5V21h3.5L18.1 10.4l-3.5-3.5L4 17.5Z" />
+        <path d="m15.7 5.8 1.4-1.4a1.7 1.7 0 0 1 2.4 0l.1.1a1.7 1.7 0 0 1 0 2.4l-1.4 1.4" />
+      </svg>
+    );
+  }
+
+  if (icon === "check") {
+    return (
+      <svg className="playToolIcon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="m5 12.5 4.2 4.2L19.5 6.4" />
+      </svg>
+    );
+  }
+
+  if (icon === "cross") {
+    return (
+      <svg className="playToolIcon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6.5 6.5 17.5 17.5" />
+        <path d="M17.5 6.5 6.5 17.5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className="playToolIcon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m4.7 14.5 8.6-8.6a2 2 0 0 1 2.8 0l2 2a2 2 0 0 1 0 2.8l-7.2 7.2H6.5l-1.8-1.8a2 2 0 0 1 0-1.6Z" />
+      <path d="M11.2 7.9 16.1 12.8" />
+      <path d="M6.5 17.9H20" />
+    </svg>
+  );
+}
+
 export function PlayBoardView({
   board,
   activeTool,
@@ -49,16 +102,19 @@ export function PlayBoardView({
   onMainMenu
 }: PlayBoardViewProps) {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [hintsOpen, setHintsOpen] = useState(false);
   const activeCells = useMemo(() => board.cells.filter((cell) => cell.isActive).length, [board.cells]);
+  const activeCharacters = useMemo(() => ensureActiveCharacterSet(board.selectedThemeId, board.activeCharacters), [board.selectedThemeId, board.activeCharacters]);
   const finalLetters = useMemo(
     () => new Set(board.cells.map((cell) => cell.finalLetter).filter((letter): letter is string => Boolean(letter))),
     [board.cells]
   );
+  const hintTexts = useMemo(() => describeHints(board.hints, board, activeCharacters), [board, activeCharacters]);
   const boardStyle = {
     gridTemplateColumns: `repeat(${board.cols}, minmax(18px, 1fr))`,
     gridTemplateRows: `repeat(${board.rows}, minmax(18px, 1fr))`,
     aspectRatio: `${board.cols} / ${board.rows}`,
-    maxWidth: `min(100%, ${(70 * board.cols) / board.rows}dvh)`,
+    maxWidth: `min(100%, ${(58 * board.cols) / board.rows}dvh)`,
     "--board-cols": board.cols,
     "--board-rows": board.rows
   } as CSSProperties & Record<string, string | number>;
@@ -121,35 +177,14 @@ export function PlayBoardView({
     <section className="playScreen">
       <div className="playHeader">
         <div>
-          <p className="eyebrow compactEyebrow">Speelmodus</p>
+          <p className="eyebrow compactEyebrow">Speelmodus beta</p>
           <h2>Vul het bord in</h2>
-          <p>{activeCells} actieve cellen. Kies een letter, kies Mogelijk of Definitief en tik daarna op een cel.</p>
+          <p>{activeCells} actieve cellen. Kies een personage, kies Aantekening of Plaatsen en tik daarna op een cel.</p>
         </div>
 
         <div className="playHeaderButtons">
+          <button className="ghostButton smallButton" type="button" onClick={() => setHintsOpen((open) => !open)}>{hintsOpen ? "Verberg hints" : "Hints"}</button>
           <button className="ghostButton smallButton" type="button" onClick={onMainMenu}>Hoofdmenu</button>
-        </div>
-      </div>
-
-      <div className="playControls">
-        <div className="letterRow" aria-label="Mogelijke letters">
-          {PLAY_LETTERS.map((letter) => (
-            <button
-              className={selectedLetter === letter ? "playTool activeLetter" : "playTool"}
-              type="button"
-              key={letter}
-              onClick={() => selectLetter(letter)}
-            >
-              {letter}
-            </button>
-          ))}
-        </div>
-
-        <div className="playActionRow">
-          <button className={activeTool === "letter" ? "playTool active" : "playTool"} type="button" onClick={() => onToolChange("letter")}>Mogelijk</button>
-          <button className={activeTool === "final" ? "playTool active" : "playTool"} type="button" onClick={() => onToolChange("final")}>Definitief</button>
-          <button className={activeTool === "cross" ? "playTool active" : "playTool"} type="button" onClick={() => onToolChange("cross")}>X</button>
-          <button className={activeTool === "erase" ? "playTool active" : "playTool"} type="button" onClick={() => onToolChange("erase")}>Wis</button>
         </div>
       </div>
 
@@ -209,6 +244,61 @@ export function PlayBoardView({
             );
           })}
         </div>
+      </div>
+
+      <div className="playControls">
+        <div className="characterRow" aria-label="Personages">
+          {PLAY_LETTERS.map((letter) => {
+            const character = activeCharacters[letter];
+            const portraitStyle = { "--character-accent": character.accentColor } as CSSProperties & Record<string, string>;
+
+            return (
+              <button
+                className={selectedLetter === letter ? "characterChip selectedCharacter" : "characterChip"}
+                type="button"
+                key={character.id}
+                onClick={() => selectLetter(letter)}
+                aria-label={`Kies ${character.name} voor letter ${letter}`}
+              >
+                <span className="characterPortrait" style={portraitStyle} />
+                <span className="characterName">{character.name}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="playActionRow" aria-label="Acties">
+          {PLAY_ACTIONS.map((action) => (
+            <button
+              className={activeTool === action.mode ? "playTool active actionTool" : "playTool actionTool"}
+              type="button"
+              key={action.mode}
+              onClick={() => onToolChange(action.mode)}
+            >
+              <PlayActionIcon icon={action.icon} />
+              <span>{action.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {hintsOpen && (
+          <div className="hintPanel">
+            <div className="hintPanelHeader">
+              <strong>Hints beta</strong>
+              <span>{hintTexts.length} regels</span>
+            </div>
+
+            {hintTexts.length > 0 ? (
+              <ol>
+                {hintTexts.map((hintText, index) => (
+                  <li key={`${hintText}-${index}`}>{hintText}</li>
+                ))}
+              </ol>
+            ) : (
+              <p>Nog geen hints gekoppeld aan dit bord. De beta-engine ondersteunt al rij, kolom, kamer, naast, diagonaal, rand, afstand en gender-aantallen.</p>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );
