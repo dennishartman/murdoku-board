@@ -226,6 +226,7 @@ export function PlayBoardView({
 }: PlayBoardViewProps) {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [hintsOpen, setHintsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [debugSolutionOpen, setDebugSolutionOpen] = useState(false);
   const activeCells = useMemo(() => board.cells.filter((cell) => cell.isActive).length, [board.cells]);
   const activeLetters = useMemo(() => (board.activeLetters.length > 0 ? board.activeLetters : PLAY_LETTERS), [board.activeLetters]);
@@ -272,6 +273,7 @@ export function PlayBoardView({
   useEffect(() => {
     if (!board.solution) {
       setDebugSolutionOpen(false);
+      setSettingsOpen(false);
     }
   }, [board.solution]);
 
@@ -350,12 +352,27 @@ export function PlayBoardView({
 
         <div className="playHeaderButtons">
           <button className="ghostButton smallButton" type="button" onClick={() => setHintsOpen((open) => !open)}>{hintsOpen ? "Verberg hints" : "Hints"}</button>
-          <button className="ghostButton smallButton" type="button" onClick={() => setDebugSolutionOpen((open) => !open)} disabled={!board.solution}>{debugSolutionOpen ? "Verberg oplossing" : "Debug oplossing"}</button>
+          <button className="ghostButton smallButton" type="button" onClick={() => setSettingsOpen((open) => !open)}>{settingsOpen ? "Sluit instellingen" : "Instellingen"}</button>
           <button className="ghostButton smallButton" type="button" onClick={onMainMenu}>Hoofdmenu</button>
         </div>
       </div>
 
       {toastMessage && <div className="playToast" role="status">{toastMessage}</div>}
+
+      {settingsOpen && (
+        <div className="playSettingsPanel">
+          <div className="hintPanelHeader">
+            <strong>Instellingen</strong>
+            <span>Debug</span>
+          </div>
+          <p>Debug opties zijn alleen bedoeld om het bord te controleren.</p>
+          <div className="playSettingsActions">
+            <button className="ghostButton smallButton" type="button" onClick={() => setDebugSolutionOpen((open) => !open)} disabled={!board.solution}>
+              {debugSolutionOpen ? "Verberg debug oplossing" : "Toon debug oplossing"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="playBoardWrap">
         <div className="manualBoard playBoard" style={boardStyle}>
