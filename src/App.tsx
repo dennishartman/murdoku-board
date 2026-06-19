@@ -3,30 +3,43 @@ import { BoardEditorView } from "./components/BoardView";
 import { PlayBoardView } from "./components/PlayBoardView";
 import { SetupPanel } from "./components/SetupPanel";
 import { ToolBar } from "./components/ToolBar";
-import { createBoard, normalizeBoard, PLAY_LETTERS } from "./lib/boardModel";
+import { createBoard, DEFAULT_DIFFICULTY, normalizeBoard, PLAY_LETTERS } from "./lib/boardModel";
 import { loadBoard, saveBoard } from "./lib/storage";
-import type { BoardGrid, BuilderToolMode, PlayToolMode } from "./types/board";
+import type { BoardGrid, BuilderToolMode, PlayToolMode, PuzzleDifficulty } from "./types/board";
 
 type ScreenMode = "setup" | "edit" | "play";
+
+function difficultyLabel(difficulty: PuzzleDifficulty) {
+  if (difficulty === "easy") {
+    return "Makkelijk";
+  }
+
+  if (difficulty === "hard") {
+    return "Moeilijk";
+  }
+
+  return "Normaal";
+}
 
 export function App() {
   const [rows, setRows] = useState(12);
   const [cols, setCols] = useState(10);
+  const [difficulty, setDifficulty] = useState<PuzzleDifficulty>(DEFAULT_DIFFICULTY);
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
   const [board, setBoard] = useState<BoardGrid | null>(null);
   const [mode, setMode] = useState<ScreenMode>("setup");
   const [activeBuilderTool, setActiveBuilderTool] = useState<BuilderToolMode>("shape");
   const [activePlayTool, setActivePlayTool] = useState<PlayToolMode>("letter");
   const [selectedLetter, setSelectedLetter] = useState<string>(PLAY_LETTERS[0]);
-  const [status, setStatus] = useState("Kies rijen en kolommen en maak daarna een leeg basisgrid.");
+  const [status, setStatus] = useState("Kies rijen, kolommen en moeilijkheid en maak daarna een leeg basisgrid.");
 
   function handleCreateBoard() {
-    const newBoard = createBoard(rows, cols, referenceImageUrl);
+    const newBoard = createBoard(rows, cols, referenceImageUrl, difficulty);
     setBoard(newBoard);
     setMode("edit");
     setActiveBuilderTool("shape");
     setSelectedLetter(newBoard.activeLetters[0] ?? PLAY_LETTERS[0]);
-    setStatus(`Basisgrid gemaakt met ${newBoard.activeLetters.length - 1} verdachten en 1 slachtoffer. Gebruik Vorm om cellen buiten het bord weg te halen.`);
+    setStatus(`Basisgrid gemaakt. Maximum ${newBoard.maxCharacters} personages, gekozen: ${newBoard.activeLetters.length - 1} verdachten en 1 slachtoffer (${difficultyLabel(newBoard.difficulty)}).`);
   }
 
   async function handleSave() {
@@ -55,6 +68,7 @@ export function App() {
     setBoard(loadedBoard);
     setRows(loadedBoard.rows);
     setCols(loadedBoard.cols);
+    setDifficulty(loadedBoard.difficulty);
     setReferenceImageUrl(loadedBoard.referenceImageUrl);
     setMode("edit");
     setActiveBuilderTool("shape");
@@ -122,7 +136,7 @@ export function App() {
             <span>1</span>
             <div>
               <h2>Huidig bord</h2>
-              <p>{activeCells} actieve cellen, {board.rooms.length} kamers, {suspectCount} verdachten en 1 slachtoffer.</p>
+              <p>{activeCells} actieve cellen, {board.rooms.length} kamers, max {board.maxCharacters} personages, gekozen: {suspectCount} verdachten en 1 slachtoffer.</p>
             </div>
           </div>
 
@@ -137,9 +151,11 @@ export function App() {
         <SetupPanel
           rows={rows}
           cols={cols}
+          difficulty={difficulty}
           referenceImageUrl={referenceImageUrl}
           onRowsChange={setRows}
           onColsChange={setCols}
+          onDifficultyChange={setDifficulty}
           onReferenceImageChange={setReferenceImageUrl}
           onCreateBoard={handleCreateBoard}
           onLoadSaved={handleLoadSaved}
