@@ -4,6 +4,7 @@ import { PlayBoardView } from "./components/PlayBoardView";
 import { SetupPanel } from "./components/SetupPanel";
 import { ToolBar } from "./components/ToolBar";
 import { createBoardForDifficulty, DEFAULT_DIFFICULTY, getBoardSizeRangeLabel, normalizeBoard, PLAY_LETTERS } from "./lib/boardModel";
+import { describeSolution, generateSolution } from "./lib/solutionGenerator";
 import { loadBoard, saveBoard } from "./lib/storage";
 import type { BoardGrid, BuilderToolMode, PlayToolMode, PuzzleDifficulty } from "./types/board";
 
@@ -29,11 +30,13 @@ export function App() {
   const [activeBuilderTool, setActiveBuilderTool] = useState<BuilderToolMode>("shape");
   const [activePlayTool, setActivePlayTool] = useState<PlayToolMode>("letter");
   const [selectedLetter, setSelectedLetter] = useState<string>(PLAY_LETTERS[0]);
+  const [showSolution, setShowSolution] = useState(false);
   const [status, setStatus] = useState("Kies een moeilijkheid en maak daarna automatisch een passend bord.");
 
   function handleCreateBoard() {
     const newBoard = createBoardForDifficulty(difficulty, referenceImageUrl);
     setBoard(newBoard);
+    setShowSolution(false);
     setMode("edit");
     setActiveBuilderTool("shape");
     setSelectedLetter(newBoard.activeLetters[0] ?? PLAY_LETTERS[0]);
@@ -48,7 +51,8 @@ export function App() {
     try {
       const saved = await saveBoard(board, "Murdoku bord");
       const imageText = saved.board.referenceImageUrl ? " inclusief referentiefoto" : " zonder referentiefoto";
-      setStatus(`Bord opgeslagen op dit apparaat${imageText}.`);
+      const solutionText = saved.board.solution ? " inclusief verborgen oplossing" : " zonder verborgen oplossing";
+      setStatus(`Bord opgeslagen op dit apparaat${imageText}${solutionText}.`);
     } catch {
       setStatus("Opslaan is mislukt. Probeer eventueel de referentiefoto te verwijderen en bewaar opnieuw.");
     }
@@ -66,6 +70,7 @@ export function App() {
     setBoard(loadedBoard);
     setDifficulty(loadedBoard.difficulty);
     setReferenceImageUrl(loadedBoard.referenceImageUrl);
+    setShowSolution(false);
     setMode("edit");
     setActiveBuilderTool("shape");
     setSelectedLetter(loadedBoard.activeLetters[0] ?? PLAY_LETTERS[0]);
@@ -74,6 +79,7 @@ export function App() {
 
   function handleNewBoard() {
     setBoard(null);
+    setShowSolution(false);
     setMode("setup");
     setActiveBuilderTool("shape");
     setActivePlayTool("letter");
@@ -88,6 +94,7 @@ export function App() {
 
     const normalizedBoard = normalizeBoard(board);
     setBoard(normalizedBoard);
+    setShowSolution(false);
     setSelectedLetter(normalizedBoard.activeLetters[0] ?? PLAY_LETTERS[0]);
     setMode("play");
     setActivePlayTool("letter");
@@ -108,9 +115,40 @@ export function App() {
     setStatus("Hoofdmenu geopend. Speel het huidige bord verder, bewerk het bord, maak een nieuw bord of laad een opgeslagen bord.");
   }
 
+  function handleGenerateSolution() {
+    if (!board) {
+      return;
+    }
+
+    const normalizedBoard = normalizeBoard(board);
+    const result = generateSolution(normalizedBoard);
+
+    if (!result.ok) {
+      setBoard(normalizedBoard);
+      setShowSolution(false);
+      setStatus(result.message);
+      return;
+    }
+
+    const nextBoard = normalizeBoard({ ...normalizedBoard, solution: result.solution });
+    setBoard(nextBoard);
+    setShowSolution(true);
+    setStatus(`${result.message} Elke rij en kolom heeft precies 1 personage.`);
+  }
+
+  function handleBoardChange(nextBoard: BoardGrid) {
+    const normalizedBoard = normalizeBoard(nextBoard);
+    setBoard(normalizedBoard);
+
+    if (!normalizedBoard.solution) {
+      setShowSolution(false);
+    }
+  }
+
   const activeCells = board?.cells.filter((cell) => cell.isActive).length ?? 0;
   const personCount = board?.activeLetters.length ?? 0;
   const suspectCount = personCount > 0 ? Math.max(0, personCount - 1) : 0;
+  const solutionRows = board ? describeSolution(board) : [];
 
   return (
     <main className={mode === "play" ? "appShell playShell" : "appShell"}>
@@ -163,6 +201,8 @@ export function App() {
             activeTool={activeBuilderTool}
             roomCount={board.rooms.length}
             activeCells={activeCells}
+            solutionReady={Boolean(board.solution)}
+            showSolution={showSolution}
             onToolChange={(tool) => {
               setActiveBuilderTool(tool);
               setStatus(tool === "wall" ? "Klik of sleep over een rand. Start horizontaal voor horizontale lijnen en verticaal voor verticale lijnen." : "Tool gewijzigd.");
@@ -170,9 +210,34 @@ export function App() {
             onSave={handleSave}
             onPlay={handlePlayBoard}
             onNewBoard={handleNewBoard}
+            onGenerateSolution={handleGenerateSolution}
+            onToggleSolution={() => setShowSolution((value) => !value)}
           />
 
-          <BoardEditorView board={board} activeTool={activeBuilderTool} onBoardChange={setBoard} />
+          {showSolution && board.solution && (
+            <section className="card solutionCard">
+              <div className="sectionTitle compact">
+                <span>3</span>
+                <div>
+                  <h2>Verborgen oplossing</h2>
+                  <p>Debugweergave voor het testen. Dit wordt later verborgen voor spelers.</p>
+                </div>
+              </div>
+
+              <div className="solutionGrid">
+                {solutionRows.map((entry) => (
+                  <div className="solutionItem" key={entry.letter}>
+                    <strong>{entry.letter}</strong>
+                    <span>{entry.name}</span>
+                    <small>{entry.role === "victim" ? "slachtoffer" : "verdachte"}</small>
+                    <em>Rij {entry.row}, kolom {entry.col}</em>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <BoardEditorView board={board} activeTool={activeBuilderTool} onBoardChange={handleBoardChange} />
         </>
       )}
 
