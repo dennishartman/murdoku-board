@@ -3,7 +3,7 @@ import { clearCellPlay, DEFAULT_ROOM_COLOR, hasBoundary, PLAY_LETTERS, toggleCel
 import { ensureActiveCharacterSet } from "../lib/characterPool";
 import { describeHints } from "../lib/hintEngine";
 import { getObjectDefinition, getObstacleDefinition } from "../lib/themeContent";
-import type { BoardGrid, PlayLetter, PlayToolMode } from "../types/board";
+import type { ActiveCharacterSet, BoardGrid, Hint, HintSubject, PlayLetter, PlayToolMode } from "../types/board";
 
 type PlayBoardViewProps = {
   board: BoardGrid;
@@ -21,6 +21,16 @@ type PlayAction = {
   mode: PlayToolMode;
   label: string;
   icon: PlayActionIconName;
+};
+
+type HintTextGroup = {
+  key: string;
+  title: string;
+  items: Array<{
+    hint: Hint;
+    text: string;
+    index: number;
+  }>;
 };
 
 const GRID_LINE_COLOR = "#000000";
@@ -92,6 +102,82 @@ function cellBorderStyle(board: BoardGrid, row: number, col: number): CSSPropert
   };
 }
 
+function subjectGroupKey(subject: HintSubject) {
+  if (subject.kind === "character") {
+    return `character:${subject.letter}`;
+  }
+
+  return `gender:${subject.gender}`;
+}
+
+function hintGroupKey(hint: Hint) {
+  if (hint.type === "murderer_room") {
+    return `character:${hint.victimLetter}`;
+  }
+
+  if (hint.type === "room_person_count") {
+    return "general";
+  }
+
+  if (hint.type === "room_group_count") {
+    return hint.subject ? subjectGroupKey(hint.subject) : "general";
+  }
+
+  return subjectGroupKey(hint.subject);
+}
+
+function hintGroupTitle(activeCharacters: ActiveCharacterSet, key: string) {
+  if (key.startsWith("character:")) {
+    const letter = key.replace("character:", "") as PlayLetter;
+    const character = activeCharacters[letter];
+
+    return character ? `${character.name} (${letter})` : `Personage ${letter}`;
+  }
+
+  if (key === "gender:male") {
+    return "Mannen";
+  }
+
+  if (key === "gender:female") {
+    return "Vrouwen";
+  }
+
+  if (key === "gender:neutral") {
+    return "Personen";
+  }
+
+  return "Algemene hints";
+}
+
+function makeHintGroups(board: BoardGrid, hintTexts: string[], activeCharacters: ActiveCharacterSet) {
+  const groups: HintTextGroup[] = [];
+  const groupIndexes = new Map<string, number>();
+
+  board.hints.forEach((hint, index) => {
+    const key = hintGroupKey(hint);
+    const item = {
+      hint,
+      text: hintTexts[index] ?? "Onbekende hint.",
+      index
+    };
+    const groupIndex = groupIndexes.get(key);
+
+    if (groupIndex === undefined) {
+      groupIndexes.set(key, groups.length);
+      groups.push({
+        key,
+        title: hintGroupTitle(activeCharacters, key),
+        items: [item]
+      });
+      return;
+    }
+
+    groups[groupIndex].items.push(item);
+  });
+
+  return groups;
+}
+
 function PlayActionIcon({ icon }: { icon: PlayActionIconName }) {
   if (icon === "pencil") {
     return (
@@ -149,6 +235,7 @@ export function PlayBoardView({
     [board.cells]
   );
   const hintTexts = useMemo(() => describeHints(board.hints, board, activeCharacters), [board, activeCharacters]);
+  const hintGroups = useMemo(() => makeHintGroups(board, hintTexts, activeCharacters), [board, hintTexts, activeCharacters]);
   const boardStyle = {
     gridTemplateColumns: `repeat(${board.cols}, minmax(18px, 1fr))`,
     gridTemplateRows: `repeat(${board.rows}, minmax(18px, 1fr))`,
@@ -376,15 +463,25 @@ export function PlayBoardView({
           <div className="hintPanel">
             <div className="hintPanelHeader">
               <strong>Hints beta</strong>
-              <span>{hintTexts.length} regels</span>
+              <span>{hintTexts.length} hints</span>
             </div>
 
-            {hintTexts.length > 0 ? (
-              <ol>
-                {hintTexts.map((hintText, index) => (
-                  <li key={`${hintText}-${index}`}>{hintText}</li>
+            {hintGroups.length > 0 ? (
+              <div className="playHintText" aria-label="Gegroepeerde hints">
+                {hintGroups.map((group) => (
+                  <article className="playHintGroup" key={group.key}>
+                    <h3>{group.title}</h3>
+                    <p>
+                      {group.items.map((item) => (
+                        <span className="playHintSentence" key={item.hint.id}>
+                          <strong>{item.index + 1}.</strong>
+                          <span>{item.text}</span>
+                        </span>
+                      ))}
+                    </p>
+                  </article>
                 ))}
-              </ol>
+              </div>
             ) : (
               <p>Nog geen hints gekoppeld aan dit bord. De beta-engine ondersteunt al rij, kolom, kamer, naast, diagonaal, rand, afstand en gender-aantallen.</p>
             )}
