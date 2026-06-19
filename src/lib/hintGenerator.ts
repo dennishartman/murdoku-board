@@ -53,6 +53,30 @@ type GenerateHintsResult =
 
 const CANDIDATE_LIMIT = 8000;
 
+function getGeneralHintLimit(board: BoardGrid) {
+  if (board.difficulty === "hard") {
+    return 1;
+  }
+
+  return 2;
+}
+
+function getExtraSpecificHintLimit(board: BoardGrid) {
+  if (board.difficulty === "easy") {
+    return 5;
+  }
+
+  if (board.difficulty === "hard") {
+    return 2;
+  }
+
+  return 4;
+}
+
+function getMaxHintCount(board: BoardGrid) {
+  return board.activeLetters.length + getGeneralHintLimit(board) + getExtraSpecificHintLimit(board);
+}
+
 function getCell(board: BoardGrid, row: number, col: number) {
   return board.cells.find((cell) => cell.row === row && cell.col === col) ?? null;
 }
@@ -158,15 +182,33 @@ function getSolutionPositions(board: BoardGrid, solution: BoardSolution | null =
   return result;
 }
 
+function countTargetTypes(board: BoardGrid) {
+  const objectCounts = new Map<string, number>();
+  const obstacleCounts = new Map<string, number>();
+
+  for (const cell of board.cells) {
+    if (cell.isObject && cell.objectType) {
+      objectCounts.set(cell.objectType, (objectCounts.get(cell.objectType) ?? 0) + 1);
+    }
+
+    if (cell.isBlocked && cell.obstacleType) {
+      obstacleCounts.set(cell.obstacleType, (obstacleCounts.get(cell.obstacleType) ?? 0) + 1);
+    }
+  }
+
+  return { objectCounts, obstacleCounts };
+}
+
 function getTargets(board: BoardGrid) {
   const result: TargetCell[] = [];
+  const { objectCounts, obstacleCounts } = countTargetTypes(board);
 
   for (const cell of board.cells) {
     if (!cell.isActive) {
       continue;
     }
 
-    if (cell.isObject && cell.objectType) {
+    if (cell.isObject && cell.objectType && objectCounts.get(cell.objectType) === 1) {
       result.push({
         row: cell.row,
         col: cell.col,
@@ -174,7 +216,7 @@ function getTargets(board: BoardGrid) {
       });
     }
 
-    if (cell.isBlocked && cell.obstacleType) {
+    if (cell.isBlocked && cell.obstacleType && obstacleCounts.get(cell.obstacleType) === 1) {
       result.push({
         row: cell.row,
         col: cell.col,
@@ -195,11 +237,19 @@ function hintSubjectLetter(hint: Hint) {
     return hint.victimLetter;
   }
 
+  if (hint.type === "room_person_count") {
+    return null;
+  }
+
   if (hint.type === "room_group_count") {
     return subjectLetter(hint.subject);
   }
 
   return subjectLetter(hint.subject);
+}
+
+function isGeneralHint(hint: Hint) {
+  return hint.type === "room_person_count" || (hint.type === "room_group_count" && !hint.subject);
 }
 
 function isValidCandidateCell(board: BoardGrid, row: number, col: number) {
@@ -419,6 +469,11 @@ function evaluateHintForCandidate(board: BoardGrid, candidate: CandidateSolution
     return candidate.murdererLetter !== null;
   }
 
+  if (hint.type === "room_person_count") {
+    const count = board.activeLetters.filter((letter) => getCellRoomId(board, getPosition(candidate.solution, letter)) === hint.roomId).length;
+    return count === hint.count;
+  }
+
   if (hint.type === "row_column") {
     const subjectPositions = positionsForSubject(board, candidate, hint.subject);
     const targetIndex = hint.index - 1;
@@ -524,6 +579,20 @@ function evaluateHintForCandidate(board: BoardGrid, candidate: CandidateSolution
 
 function filterCandidateSolutions(board: BoardGrid, candidates: CandidateSolution[], hint: Hint) {
   return candidates.filter((candidate) => evaluateHintForCandidate(board, candidate, hint));
+}
+
+function distinctPositionCount(candidates: CandidateSolution[], letter: PlayLetter) {
+  const positions = new Set<string>();
+
+  for (const candidate of candidates) {
+    const position = getPosition(candidate.solution, letter);
+
+    if (position) {
+      positions.add(`${position.row}:${position.col}`);
+    }
+  }
+
+  return positions.size;
 }
 
 function addRoomHints(board: BoardGrid, positions: PositionedLetter[], hints: Hint[]) {
@@ -712,6 +781,36 @@ function addCharacterGenderRoomHints(board: BoardGrid, positions: PositionedLett
   }
 }
 
+function addGeneralRoomHints(board: BoardGrid, positions: PositionedLetter[], hints: Hint[]) {
+  for (const room of board.rooms) {
+    const count = positions.filter((position) => position.roomId === room.id).length;
+
+    if (count > 0) {
+      hints.push({
+        id: `room-person-count-${room.id}-${count}`,
+        type: "room_person_count",
+        roomId: room.id,
+        count
+      });
+    }
+
+    for (const gender of ["female", "male", "neutral"] as CharacterGender[]) {
+      const genderCount = positions.filter((position) => position.roomId === room.id && board.activeCharacters[position.letter]?.gender === gender).length;
+
+      if (genderCount > 0) {
+        hints.push({
+          id: `room-gender-count-${room.id}-${gender}-${genderCount}`,
+          type: "room_group_count",
+          roomId: room.id,
+          group: { kind: "gender", gender },
+          countMode: "total",
+          count: genderCount
+        });
+      }
+    }
+  }
+}
+
 function addMurdererSupportHints(board: BoardGrid, positions: PositionedLetter[], hints: Hint[]) {
   const murderer = board.murdererLetter ? positions.find((position) => position.letter === board.murdererLetter) : null;
   const victim = positions.find((position) => position.letter === "V");
@@ -730,6 +829,10 @@ function addMurdererSupportHints(board: BoardGrid, positions: PositionedLetter[]
 function hintPriority(board: BoardGrid, hint: Hint) {
   if (hint.type === "murderer_room") {
     return 0;
+  }
+
+  if (hint.type === "room_person_count") {
+    return board.difficulty === "hard" ? 4 : 1;
   }
 
   if (board.difficulty === "easy") {
@@ -780,19 +883,19 @@ function hintPriority(board: BoardGrid, hint: Hint) {
     return 6;
   }
 
-  if (hint.type === "adjacent" || hint.type === "diagonal") {
+  if (hint.type === "room") {
     return 1;
   }
 
-  if (hint.type === "room") {
+  if (hint.type === "adjacent" || hint.type === "diagonal") {
     return 2;
   }
 
-  if (hint.type === "distance" || hint.type === "direction") {
+  if (hint.type === "edge") {
     return 3;
   }
 
-  if (hint.type === "edge") {
+  if (hint.type === "distance" || hint.type === "direction") {
     return 4;
   }
 
@@ -815,6 +918,9 @@ function selectBetaHints(board: BoardGrid, hintCandidates: Hint[], baseCandidate
   const selected: Hint[] = [];
   const usedLetters = new Set<PlayLetter>();
   const usedHintIds = new Set<string>();
+  const generalHintLimit = getGeneralHintLimit(board);
+  const maxHintCount = getMaxHintCount(board);
+  let generalHintCount = 0;
   let currentCandidates = baseCandidates;
   const victimHint = hintCandidates.find((hint) => hint.type === "murderer_room" && hint.victimLetter === "V");
 
@@ -825,89 +931,97 @@ function selectBetaHints(board: BoardGrid, hintCandidates: Hint[], baseCandidate
     currentCandidates = filterCandidateSolutions(board, currentCandidates, victimHint);
   }
 
-  while (usedLetters.size < board.activeLetters.length) {
-    if (currentCandidates.length === 1) {
-      for (const letter of board.activeLetters) {
-        if (usedLetters.has(letter)) {
-          continue;
-        }
+  while ((usedLetters.size < board.activeLetters.length || currentCandidates.length > 1) && selected.length < maxHintCount) {
+    let best: { letter: PlayLetter | null; hint: Hint; filtered: CandidateSolution[]; reduction: number; priority: number; solvesLetter: boolean; coversMissingLetter: boolean; isGeneral: boolean } | null = null;
 
-        const fallbackHint = bestNonReducingHint(board, letter, hintCandidates, usedHintIds);
-
-        if (!fallbackHint) {
-          return {
-            ok: false,
-            hints: selected,
-            remainingSolutions: currentCandidates.length,
-            message: `Er is geen aanvullende hint gevonden voor ${letter}.`
-          };
-        }
-
-        selected.push(fallbackHint);
-        usedLetters.add(letter);
-        usedHintIds.add(fallbackHint.id);
+    for (const hint of hintCandidates) {
+      if (usedHintIds.has(hint.id)) {
+        continue;
       }
 
+      const letter = hintSubjectLetter(hint);
+      const general = isGeneralHint(hint);
+
+      if (general && generalHintCount >= generalHintLimit) {
+        continue;
+      }
+
+      const filtered = filterCandidateSolutions(board, currentCandidates, hint);
+
+      if (filtered.length === 0) {
+        continue;
+      }
+
+      const reduction = currentCandidates.length - filtered.length;
+      const coversMissingLetter = Boolean(letter && !usedLetters.has(letter));
+      const solvesLetter = Boolean(letter && distinctPositionCount(currentCandidates, letter) > 1 && distinctPositionCount(filtered, letter) === 1);
+
+      if (reduction <= 0 && (!coversMissingLetter || currentCandidates.length > 1)) {
+        continue;
+      }
+
+      const priority = hintPriority(board, hint);
+
+      if (
+        !best ||
+        (coversMissingLetter && !best.coversMissingLetter) ||
+        (coversMissingLetter === best.coversMissingLetter && solvesLetter && !best.solvesLetter) ||
+        (coversMissingLetter === best.coversMissingLetter && solvesLetter === best.solvesLetter && filtered.length < best.filtered.length) ||
+        (coversMissingLetter === best.coversMissingLetter && solvesLetter === best.solvesLetter && filtered.length === best.filtered.length && priority < best.priority) ||
+        (coversMissingLetter === best.coversMissingLetter && solvesLetter === best.solvesLetter && filtered.length === best.filtered.length && priority === best.priority && reduction > best.reduction) ||
+        (coversMissingLetter === best.coversMissingLetter && solvesLetter === best.solvesLetter && filtered.length === best.filtered.length && priority === best.priority && reduction === best.reduction && hint.id.localeCompare(best.hint.id) < 0)
+      ) {
+        best = { letter, hint, filtered, reduction, priority, solvesLetter, coversMissingLetter, isGeneral: general };
+      }
+    }
+
+    if (!best) {
       break;
     }
 
-    let best: { letter: PlayLetter; hint: Hint; filtered: CandidateSolution[]; reduction: number; priority: number } | null = null;
+    selected.push(best.hint);
+    usedHintIds.add(best.hint.id);
 
+    if (best.letter) {
+      usedLetters.add(best.letter);
+    }
+
+    if (best.isGeneral) {
+      generalHintCount += 1;
+    }
+
+    currentCandidates = best.filtered;
+  }
+
+  if (currentCandidates.length === 1) {
     for (const letter of board.activeLetters) {
       if (usedLetters.has(letter)) {
         continue;
       }
 
-      const letterHints = hintCandidates.filter((hint) => hintSubjectLetter(hint) === letter && hint.type !== "murderer_room" && !usedHintIds.has(hint.id));
+      const fallbackHint = bestNonReducingHint(board, letter, hintCandidates, usedHintIds);
 
-      for (const hint of letterHints) {
-        const filtered = filterCandidateSolutions(board, currentCandidates, hint);
-
-        if (filtered.length === 0) {
-          continue;
-        }
-
-        const reduction = currentCandidates.length - filtered.length;
-
-        if (reduction <= 0) {
-          continue;
-        }
-
-        const priority = hintPriority(board, hint);
-
-        if (
-          !best ||
-          filtered.length < best.filtered.length ||
-          (filtered.length === best.filtered.length && priority < best.priority) ||
-          (filtered.length === best.filtered.length && priority === best.priority && reduction > best.reduction) ||
-          (filtered.length === best.filtered.length && priority === best.priority && reduction === best.reduction && hint.id.localeCompare(best.hint.id) < 0)
-        ) {
-          best = { letter, hint, filtered, reduction, priority };
-        }
+      if (!fallbackHint || selected.length >= maxHintCount) {
+        return {
+          ok: false,
+          hints: selected,
+          remainingSolutions: currentCandidates.length,
+          message: `Er is geen aanvullende hint gevonden voor ${letter}.`
+        };
       }
-    }
 
-    if (!best) {
-      return {
-        ok: false,
-        hints: selected,
-        remainingSolutions: currentCandidates.length,
-        message: `Er blijven ${currentCandidates.length} oplossingen over, maar geen resterende hint verkleint de oplossingenset nog.`
-      };
+      selected.push(fallbackHint);
+      usedLetters.add(letter);
+      usedHintIds.add(fallbackHint.id);
     }
-
-    selected.push(best.hint);
-    usedLetters.add(best.letter);
-    usedHintIds.add(best.hint.id);
-    currentCandidates = best.filtered;
   }
 
-  if (selected.length !== board.activeLetters.length) {
+  if (usedLetters.size !== board.activeLetters.length) {
     return {
       ok: false,
       hints: selected,
       remainingSolutions: currentCandidates.length,
-      message: "Niet elk personage kreeg precies 1 hint."
+      message: "Niet elk personage kreeg minimaal 1 hint."
     };
   }
 
@@ -940,6 +1054,7 @@ export function generateHintCandidates(board: BoardGrid) {
   addEdgeHints(board, positions, hints);
   addTargetHints(positions, getTargets(board), hints);
   addCharacterGenderRoomHints(board, positions, hints);
+  addGeneralRoomHints(board, positions, hints);
   addMurdererSupportHints(board, positions, hints);
 
   return uniqueHints(hints);
@@ -984,16 +1099,17 @@ export function generateBetaHints(board: BoardGrid): GenerateHintsResult {
       ok: false,
       hints: [],
       candidateCount: candidateResult.candidates.length,
-      message: `${selection.message} Maak extra objecten, obstakels of kamers en probeer opnieuw.`
+      message: `${selection.message} Maak extra unieke objecten, obstakels of kamers en probeer opnieuw.`
     };
   }
 
   const cappedText = candidateResult.capped ? " binnen de beta-limiet" : "";
+  const generalCount = selection.hints.filter((hint) => isGeneralHint(hint)).length;
 
   return {
     ok: true,
     hints: selection.hints,
     candidateCount: candidateResult.candidates.length,
-    message: `${selection.hints.length} hints gegenereerd: precies 1 hint per personage. Solve-flow bracht ${candidateResult.candidates.length} mogelijke oplossingen terug naar 1${cappedText}.`
+    message: `${selection.hints.length} hints gegenereerd: minimaal 1 hint per personage en ${generalCount} algemene hints. Solve-flow bracht ${candidateResult.candidates.length} mogelijke oplossingen terug naar 1${cappedText}.`
   };
 }
