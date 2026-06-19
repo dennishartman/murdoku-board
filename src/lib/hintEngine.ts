@@ -1,4 +1,4 @@
-import { getObjectDefinition } from "./themeContent";
+import { getObjectDefinition, getObstacleDefinition } from "./themeContent";
 import type { ActiveCharacterSet, BoardGrid, CharacterGender, Hint, HintSubject, HintTarget } from "../types/board";
 
 const genderSingular: Record<CharacterGender, string> = {
@@ -34,11 +34,19 @@ function describeTarget(target: HintTarget, activeCharacters: ActiveCharacterSet
     return `een ${genderSingular[target.gender]}`;
   }
 
-  if (target.objectType) {
-    return `de ${getObjectDefinition(target.objectType)?.name.toLowerCase() ?? "het object"}`;
+  if (target.kind === "object") {
+    if (target.objectType) {
+      return `de ${getObjectDefinition(target.objectType)?.name.toLowerCase() ?? "het object"}`;
+    }
+
+    return "een object";
   }
 
-  return "een object";
+  if (target.obstacleType) {
+    return `de ${getObstacleDefinition(target.obstacleType)?.name.toLowerCase() ?? "het obstakel"}`;
+  }
+
+  return "een obstakel";
 }
 
 function describeRoom(board: BoardGrid, roomId: string) {
