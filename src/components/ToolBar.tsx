@@ -4,10 +4,14 @@ type ToolBarProps = {
   activeTool: BuilderToolMode;
   roomCount: number;
   activeCells: number;
+  solutionReady: boolean;
+  showSolution: boolean;
   onToolChange: (tool: BuilderToolMode) => void;
   onSave: () => void;
   onPlay: () => void;
   onNewBoard: () => void;
+  onGenerateSolution: () => void;
+  onToggleSolution: () => void;
 };
 
 const tools: Array<{ id: BuilderToolMode; label: string; help: string }> = [
@@ -18,12 +22,25 @@ const tools: Array<{ id: BuilderToolMode; label: string; help: string }> = [
   { id: "blocked", label: "Stop", help: "Obstakel of stopcel" }
 ];
 
-export function ToolBar({ activeTool, roomCount, activeCells, onToolChange, onSave, onPlay, onNewBoard }: ToolBarProps) {
+export function ToolBar({
+  activeTool,
+  roomCount,
+  activeCells,
+  solutionReady,
+  showSolution,
+  onToolChange,
+  onSave,
+  onPlay,
+  onNewBoard,
+  onGenerateSolution,
+  onToggleSolution
+}: ToolBarProps) {
   return (
     <section className="card toolCard">
       <div className="toolStats">
         <span>Kamers: <strong>{roomCount}</strong></span>
         <span>Cellen: <strong>{activeCells}</strong></span>
+        <span>Oplossing: <strong>{solutionReady ? "ja" : "nee"}</strong></span>
       </div>
 
       <div className="toolGrid builderToolGrid">
@@ -39,6 +56,11 @@ export function ToolBar({ activeTool, roomCount, activeCells, onToolChange, onSa
             <span>{tool.help}</span>
           </button>
         ))}
+      </div>
+
+      <div className="buttonRow solutionActionRow">
+        <button className="primaryButton" type="button" onClick={onGenerateSolution}>Genereer oplossing</button>
+        <button className="ghostButton" type="button" onClick={onToggleSolution} disabled={!solutionReady}>{showSolution ? "Verberg oplossing" : "Toon oplossing"}</button>
       </div>
 
       <div className="buttonRow boardActionRow">
