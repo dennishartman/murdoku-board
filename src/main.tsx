@@ -4,6 +4,7 @@ import { App } from "./App";
 import "./styles.css";
 import "./hint-debug.css";
 import "./play-layout-overrides.css";
+import "./object-icons.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
