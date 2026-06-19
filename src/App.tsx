@@ -3,7 +3,7 @@ import { BoardEditorView } from "./components/BoardView";
 import { PlayBoardView } from "./components/PlayBoardView";
 import { SetupPanel } from "./components/SetupPanel";
 import { ToolBar } from "./components/ToolBar";
-import { createBoard, DEFAULT_DIFFICULTY, normalizeBoard, PLAY_LETTERS } from "./lib/boardModel";
+import { createBoardForDifficulty, DEFAULT_DIFFICULTY, getBoardSizeRangeLabel, normalizeBoard, PLAY_LETTERS } from "./lib/boardModel";
 import { loadBoard, saveBoard } from "./lib/storage";
 import type { BoardGrid, BuilderToolMode, PlayToolMode, PuzzleDifficulty } from "./types/board";
 
@@ -22,8 +22,6 @@ function difficultyLabel(difficulty: PuzzleDifficulty) {
 }
 
 export function App() {
-  const [rows, setRows] = useState(12);
-  const [cols, setCols] = useState(10);
   const [difficulty, setDifficulty] = useState<PuzzleDifficulty>(DEFAULT_DIFFICULTY);
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
   const [board, setBoard] = useState<BoardGrid | null>(null);
@@ -31,15 +29,15 @@ export function App() {
   const [activeBuilderTool, setActiveBuilderTool] = useState<BuilderToolMode>("shape");
   const [activePlayTool, setActivePlayTool] = useState<PlayToolMode>("letter");
   const [selectedLetter, setSelectedLetter] = useState<string>(PLAY_LETTERS[0]);
-  const [status, setStatus] = useState("Kies rijen, kolommen en moeilijkheid en maak daarna een leeg basisgrid.");
+  const [status, setStatus] = useState("Kies een moeilijkheid en maak daarna automatisch een passend bord.");
 
   function handleCreateBoard() {
-    const newBoard = createBoard(rows, cols, referenceImageUrl, difficulty);
+    const newBoard = createBoardForDifficulty(difficulty, referenceImageUrl);
     setBoard(newBoard);
     setMode("edit");
     setActiveBuilderTool("shape");
     setSelectedLetter(newBoard.activeLetters[0] ?? PLAY_LETTERS[0]);
-    setStatus(`Basisgrid gemaakt. Maximum ${newBoard.maxCharacters} personages, gekozen: ${newBoard.activeLetters.length - 1} verdachten en 1 slachtoffer (${difficultyLabel(newBoard.difficulty)}).`);
+    setStatus(`Basisgrid gemaakt: ${newBoard.rows}x${newBoard.cols}. Elke rij en kolom krijgt 1 personage: ${newBoard.activeLetters.length - 1} verdachten en 1 slachtoffer (${difficultyLabel(newBoard.difficulty)}).`);
   }
 
   async function handleSave() {
@@ -66,8 +64,6 @@ export function App() {
 
     const loadedBoard = normalizeBoard(saved.board);
     setBoard(loadedBoard);
-    setRows(loadedBoard.rows);
-    setCols(loadedBoard.cols);
     setDifficulty(loadedBoard.difficulty);
     setReferenceImageUrl(loadedBoard.referenceImageUrl);
     setMode("edit");
@@ -123,7 +119,7 @@ export function App() {
           <p className="eyebrow">Murdoku Board Maker PWA</p>
           <h1>Handmatig exact bord maken</h1>
           <p>
-            Maak eerst het bord: kies de gridmaat, verwijder cellen buiten de vorm, teken kamerranden, geef kamers kleur en markeer stopcellen.
+            Kies een moeilijkheid. De app kiest een passend vierkant bord. Daarna kun je kamers, kleuren, objecten en stopcellen aanpassen.
           </p>
         </header>
       )}
@@ -136,7 +132,7 @@ export function App() {
             <span>1</span>
             <div>
               <h2>Huidig bord</h2>
-              <p>{activeCells} actieve cellen, {board.rooms.length} kamers, max {board.maxCharacters} personages, gekozen: {suspectCount} verdachten en 1 slachtoffer.</p>
+              <p>{board.rows}x{board.cols}, {activeCells} actieve cellen, {board.rooms.length} kamers, {suspectCount} verdachten en 1 slachtoffer.</p>
             </div>
           </div>
 
@@ -149,13 +145,12 @@ export function App() {
 
       {mode === "setup" && (
         <SetupPanel
-          rows={rows}
-          cols={cols}
           difficulty={difficulty}
           referenceImageUrl={referenceImageUrl}
-          onRowsChange={setRows}
-          onColsChange={setCols}
-          onDifficultyChange={setDifficulty}
+          onDifficultyChange={(value) => {
+            setDifficulty(value);
+            setStatus(`${difficultyLabel(value)} gekozen. Mogelijk formaat: ${getBoardSizeRangeLabel(value)}.`);
+          }}
           onReferenceImageChange={setReferenceImageUrl}
           onCreateBoard={handleCreateBoard}
           onLoadSaved={handleLoadSaved}
