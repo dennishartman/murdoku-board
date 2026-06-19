@@ -1,5 +1,16 @@
 import { DEFAULT_THEME_ID, createActiveCharacterSet, ensureActiveCharacterSet, makeActiveLettersForCharacterCount } from "./characterPool";
-import type { BoardCell, BoardGrid, BoardRoom, BuilderToolMode, EdgeSide, PlayLetter, PuzzleDifficulty } from "../types/board";
+import { DETECTIVE_OBSTACLES, DETECTIVE_OBJECTS, getRoomDefinitionByIndex } from "./themeContent";
+import type {
+  BoardCell,
+  BoardGrid,
+  BoardObjectTypeId,
+  BoardObstacleTypeId,
+  BoardRoom,
+  BuilderToolMode,
+  EdgeSide,
+  PlayLetter,
+  PuzzleDifficulty
+} from "../types/board";
 
 export const DEFAULT_ROOM_COLOR = "#e5e7eb";
 
@@ -24,6 +35,8 @@ const BOARD_SIZE_BY_DIFFICULTY: Record<PuzzleDifficulty, number[]> = {
 };
 
 const LETTER_SLOT_ORDER = [0, 2, 6, 8, 1, 5, 7, 3, 4];
+const DEFAULT_OBJECT_TYPE: BoardObjectTypeId = DETECTIVE_OBJECTS[0]?.id ?? "chair";
+const DEFAULT_OBSTACLE_TYPE: BoardObstacleTypeId = DETECTIVE_OBSTACLES[0]?.id ?? "table";
 
 function cellKey(row: number, col: number) {
   return `${row}:${col}`;
@@ -58,6 +71,8 @@ function makeCells(rows: number, cols: number): BoardCell[] {
         roomId: null,
         isBlocked: false,
         isObject: false,
+        objectType: null,
+        obstacleType: null,
         isCrossed: false,
         manualCross: false,
         autoCrossSources: [],
@@ -140,6 +155,12 @@ function calculateActiveLetters(rows: number, cols: number, cells: BoardCell[], 
   return makeActiveLettersForCharacterCount(characterCount);
 }
 
+function clearSolution(board: BoardGrid) {
+  board.solution = null;
+  board.murdererLetter = null;
+  return board;
+}
+
 function sanitizePlayLetters(board: BoardGrid) {
   const activeLetterSet = new Set(board.activeLetters);
 
@@ -161,6 +182,7 @@ function isSolutionCellValid(board: BoardGrid, row: number, col: number) {
 
 function sanitizeSolution(board: BoardGrid) {
   if (!board.solution) {
+    board.murdererLetter = null;
     return board;
   }
 
@@ -172,13 +194,11 @@ function sanitizeSolution(board: BoardGrid) {
     const position = board.solution[letter];
 
     if (!position || !isSolutionCellValid(board, position.row, position.col)) {
-      board.solution = null;
-      return board;
+      return clearSolution(board);
     }
 
     if (usedRows.has(position.row) || usedCols.has(position.col)) {
-      board.solution = null;
-      return board;
+      return clearSolution(board);
     }
 
     usedRows.add(position.row);
@@ -187,9 +207,12 @@ function sanitizeSolution(board: BoardGrid) {
 
   for (const key of Object.keys(board.solution)) {
     if (!activeLetterSet.has(key as PlayLetter)) {
-      board.solution = null;
-      return board;
+      return clearSolution(board);
     }
+  }
+
+  if (board.murdererLetter && !activeLetterSet.has(board.murdererLetter)) {
+    return clearSolution(board);
   }
 
   return board;
@@ -209,16 +232,20 @@ export function normalizeBoard(board: BoardGrid): BoardGrid {
   const normalizedCells = board.cells.map((cell) => {
     const autoCrossSources = Array.isArray(cell.autoCrossSources) ? uniqueSources(cell.autoCrossSources) : [];
     const manualCross = typeof cell.manualCross === "boolean" ? cell.manualCross : cell.isCrossed ?? false;
+    const isObject = cell.isObject ?? false;
+    const isBlocked = cell.isBlocked ?? false;
 
     return {
       ...cell,
-      isObject: cell.isObject ?? false,
+      isObject,
+      objectType: isObject ? cell.objectType ?? DEFAULT_OBJECT_TYPE : null,
+      obstacleType: isBlocked ? cell.obstacleType ?? DEFAULT_OBSTACLE_TYPE : null,
       manualCross,
       autoCrossSources,
       isCrossed: manualCross || autoCrossSources.length > 0,
       finalLetter: cell.finalLetter ?? null,
       playMarks: Array.isArray(cell.playMarks) && cell.playMarks.length === 9 ? [...cell.playMarks] : makeEmptyMarks(),
-      isBlocked: cell.isBlocked ?? false,
+      isBlocked,
       isActive: cell.isActive ?? true,
       roomId: cell.roomId ?? null
     };
@@ -233,9 +260,18 @@ export function normalizeBoard(board: BoardGrid): BoardGrid {
     activeLetters: calculateActiveLetters(board.rows, board.cols, normalizedCells, difficulty),
     activeCharacters: ensureActiveCharacterSet(selectedThemeId, board.activeCharacters),
     solution: board.solution ?? null,
+    murdererLetter: board.murdererLetter ?? null,
     hints: Array.isArray(board.hints) ? [...board.hints] : [],
     cells: normalizedCells,
-    rooms: (board.rooms ?? []).map((room) => ({ ...room, cells: room.cells.map(([row, col]) => [row, col] as [number, number]) })),
+    rooms: (board.rooms ?? []).map((room, index) => {
+      const fallback = getRoomDefinitionByIndex(index);
+      return {
+        ...room,
+        name: typeof room.name === "string" && room.name.length > 0 ? room.name : fallback.name,
+        color: room.color ?? fallback.color,
+        cells: room.cells.map(([row, col]) => [row, col] as [number, number])
+      };
+    }),
     verticalWalls: board.verticalWalls.map((line) => [...line]),
     horizontalWalls: board.horizontalWalls.map((line) => [...line])
   };
@@ -305,6 +341,7 @@ export function createBoard(rows: number, cols: number, referenceImageUrl: strin
     activeLetters,
     activeCharacters: createActiveCharacterSet(selectedThemeId),
     solution: null,
+    murdererLetter: null,
     hints: []
   };
 
@@ -328,11 +365,11 @@ function oldRoomByCell(board: BoardGrid) {
   return result;
 }
 
-function oldRoomColor(board: BoardGrid) {
-  const result = new Map<string, string>();
+function oldRoomDetails(board: BoardGrid) {
+  const result = new Map<string, { color: string; name: string | null }>();
 
   for (const room of board.rooms) {
-    result.set(room.id, room.color);
+    result.set(room.id, { color: room.color, name: room.name ?? null });
   }
 
   return result;
@@ -371,7 +408,7 @@ function canMove(board: BoardGrid, row: number, col: number, nextRow: number, ne
 export function recalculateRooms(input: BoardGrid): BoardGrid {
   const board = cloneBoard(input);
   const previousCellRooms = oldRoomByCell(input);
-  const previousColors = oldRoomColor(input);
+  const previousDetails = oldRoomDetails(input);
   const visited = new Set<string>();
   const rooms: BoardRoom[] = [];
 
@@ -436,11 +473,13 @@ export function recalculateRooms(input: BoardGrid): BoardGrid {
     }
 
     const id = `room-${rooms.length + 1}`;
-    const color = bestOldRoomId ? previousColors.get(bestOldRoomId) ?? DEFAULT_ROOM_COLOR : DEFAULT_ROOM_COLOR;
+    const fallback = getRoomDefinitionByIndex(rooms.length);
+    const details = bestOldRoomId ? previousDetails.get(bestOldRoomId) : null;
 
     rooms.push({
       id,
-      color,
+      name: details?.name ?? fallback.name,
+      color: details?.color ?? fallback.color,
       cells: component
     });
   }
@@ -463,12 +502,14 @@ export function toggleCellActive(input: BoardGrid, row: number, col: number) {
   cell.isActive = !cell.isActive;
   cell.isBlocked = false;
   cell.isObject = false;
+  cell.objectType = null;
+  cell.obstacleType = null;
   cell.isCrossed = false;
   cell.manualCross = false;
   cell.autoCrossSources = [];
   cell.finalLetter = null;
   cell.playMarks = makeEmptyMarks();
-  board.solution = null;
+  clearSolution(board);
   return recalculateRooms(board);
 }
 
@@ -491,7 +532,14 @@ export function setEdgeBoundary(input: BoardGrid, row: number, col: number, side
     board.horizontalWalls[row + 1][col] = value;
   }
 
+  clearSolution(board);
   return recalculateRooms(board);
+}
+
+export function setRoomDetails(input: BoardGrid, roomId: string, color: string, name: string) {
+  const board = cloneBoard(input);
+  board.rooms = board.rooms.map((room) => (room.id === roomId ? { ...room, color, name } : room));
+  return board;
 }
 
 export function setRoomColor(input: BoardGrid, roomId: string, color: string) {
@@ -500,7 +548,16 @@ export function setRoomColor(input: BoardGrid, roomId: string, color: string) {
   return board;
 }
 
-export function applyBuilderTool(input: BoardGrid, row: number, col: number, tool: BuilderToolMode, color: string) {
+export function applyBuilderTool(
+  input: BoardGrid,
+  row: number,
+  col: number,
+  tool: BuilderToolMode,
+  color: string,
+  roomName = "Kamer",
+  objectType: BoardObjectTypeId = DEFAULT_OBJECT_TYPE,
+  obstacleType: BoardObstacleTypeId = DEFAULT_OBSTACLE_TYPE
+) {
   if (tool === "shape") {
     return toggleCellActive(input, row, col);
   }
@@ -513,29 +570,35 @@ export function applyBuilderTool(input: BoardGrid, row: number, col: number, too
   }
 
   if (tool === "color" && cell.roomId) {
-    return setRoomColor(board, cell.roomId, color);
+    return setRoomDetails(board, cell.roomId, color, roomName);
   }
 
   if (tool === "object") {
-    cell.isObject = !cell.isObject;
+    const nextValue = !cell.isObject || cell.objectType !== objectType;
+    cell.isObject = nextValue;
+    cell.objectType = nextValue ? objectType : null;
     if (cell.isObject) {
       cell.isBlocked = false;
+      cell.obstacleType = null;
     }
-    board.solution = null;
+    clearSolution(board);
     return recalculateRooms(board);
   }
 
   if (tool === "blocked") {
-    cell.isBlocked = !cell.isBlocked;
+    const nextValue = !cell.isBlocked || cell.obstacleType !== obstacleType;
+    cell.isBlocked = nextValue;
+    cell.obstacleType = nextValue ? obstacleType : null;
     if (cell.isBlocked) {
       cell.isObject = false;
+      cell.objectType = null;
     }
     cell.isCrossed = false;
     cell.manualCross = false;
     cell.autoCrossSources = [];
     cell.finalLetter = null;
     cell.playMarks = makeEmptyMarks();
-    board.solution = null;
+    clearSolution(board);
     board.maxCharacters = calculateMaxCharacters(board.rows, board.cols, board.cells);
     board.activeLetters = calculateActiveLetters(board.rows, board.cols, board.cells, board.difficulty);
     return recalculateAutoCrosses(board);
