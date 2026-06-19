@@ -40,6 +40,10 @@ function shuffle<T>(items: T[]) {
   return result;
 }
 
+function shuffledHintBucket(hints: Hint[]) {
+  return shuffle<Hint>(hints);
+}
+
 function uniqueHints(hints: Hint[]) {
   const seen = new Set<string>();
   const result: Hint[] = [];
@@ -379,14 +383,21 @@ function selectBetaHints(board: BoardGrid, candidates: Hint[]) {
     }
   }
 
+  const roomHints: Hint[] = softHints.filter((hint) => hint.type === "room");
+  const relationHints: Hint[] = softHints.filter((hint) => hint.type === "adjacent" || hint.type === "diagonal");
+  const edgeHints: Hint[] = softHints.filter((hint) => hint.type === "edge");
+  const genderHints: Hint[] = softHints.filter((hint) => hint.type === "room_group_count");
+  const distanceHints: Hint[] = softHints.filter((hint) => hint.type === "distance" || hint.type === "direction");
+  const rowColumnHints: Hint[] = softHints.filter((hint) => hint.type === "row_column");
+
   const buckets: Hint[][] = [
-    softHints.filter((hint) => hint.type === "room"),
-    softHints.filter((hint) => hint.type === "adjacent" || hint.type === "diagonal"),
-    softHints.filter((hint) => hint.type === "edge"),
-    softHints.filter((hint) => hint.type === "room_group_count"),
-    softHints.filter((hint) => hint.type === "distance" || hint.type === "direction"),
-    softHints.filter((hint) => hint.type === "row_column")
-  ].map((bucket) => shuffle(bucket));
+    shuffledHintBucket(roomHints),
+    shuffledHintBucket(relationHints),
+    shuffledHintBucket(edgeHints),
+    shuffledHintBucket(genderHints),
+    shuffledHintBucket(distanceHints),
+    shuffledHintBucket(rowColumnHints)
+  ];
 
   while (selected.length < targetCount && buckets.some((bucket) => bucket.length > 0)) {
     for (const bucket of buckets) {
