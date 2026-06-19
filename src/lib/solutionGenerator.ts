@@ -1,6 +1,14 @@
-import type { BoardGrid, BoardSolution, PlayLetter, SolutionPosition } from "../types/board";
+import type { BoardGrid, BoardSolution, CharacterRole, PlayLetter, SolutionPosition } from "../types/board";
 
 type CandidateCell = {
+  row: number;
+  col: number;
+};
+
+type SolutionDescription = {
+  letter: PlayLetter;
+  name: string;
+  role: CharacterRole;
   row: number;
   col: number;
 };
@@ -151,29 +159,31 @@ export function generateSolution(board: BoardGrid): GenerateSolutionResult {
   };
 }
 
-export function describeSolution(board: BoardGrid) {
+export function describeSolution(board: BoardGrid): SolutionDescription[] {
   const solution = board.solution;
 
   if (!solution) {
     return [];
   }
 
-  return board.activeLetters
-    .map((letter) => {
-      const position: SolutionPosition | undefined = solution[letter];
-      const character = board.activeCharacters[letter];
+  const descriptions: SolutionDescription[] = [];
 
-      if (!position) {
-        return null;
-      }
+  for (const letter of board.activeLetters) {
+    const position: SolutionPosition | undefined = solution[letter];
+    const character = board.activeCharacters[letter];
 
-      return {
-        letter,
-        name: character?.name ?? letter,
-        role: character?.role ?? "suspect",
-        row: position.row + 1,
-        col: position.col + 1
-      };
-    })
-    .filter((entry): entry is { letter: PlayLetter; name: string; role: string; row: number; col: number } => Boolean(entry));
+    if (!position) {
+      continue;
+    }
+
+    descriptions.push({
+      letter,
+      name: character?.name ?? letter,
+      role: character?.role ?? "suspect",
+      row: position.row + 1,
+      col: position.col + 1
+    });
+  }
+
+  return descriptions;
 }
