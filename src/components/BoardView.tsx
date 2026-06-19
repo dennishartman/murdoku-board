@@ -196,8 +196,10 @@ function getHintTarget(hint: Hint): HintTarget | null {
 }
 
 function getHintSubjectPosition(board: BoardGrid, hint: Hint) {
-  if ("subject" in hint && hint.subject.kind === "character") {
-    return getSolutionPosition(board, hint.subject.letter);
+  const subject = "subject" in hint ? hint.subject : undefined;
+
+  if (subject?.kind === "character") {
+    return getSolutionPosition(board, subject.letter);
   }
 
   return null;
