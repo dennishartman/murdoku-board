@@ -229,12 +229,89 @@
   z-index: 7;
 }
 
+.debugSettingsCard {
+  border-color: rgba(56, 189, 248, 0.36);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.debugSettingsTitle {
+  align-items: center;
+}
+
+.debugSettingsTitle > div {
+  flex: 1 1 auto;
+}
+
+.debugSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.debugSummaryItem {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.debugSummaryItem span {
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.debugSummaryItem strong {
+  color: #f8fafc;
+  font-size: 18px;
+}
+
+.debugActionRow,
+.boardActionRow {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.debugPanelSection {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 18px;
+  background: rgba(2, 6, 23, 0.36);
+}
+
+.debugPanelSection h3 {
+  margin: 0;
+  color: #fef3c7;
+}
+
+.debugPanelSection p {
+  margin: 0;
+  color: #cbd5e1;
+}
+
+.debugEmptyText {
+  padding: 12px 14px;
+  border-radius: 14px;
+  color: #fef3c7;
+  background: rgba(113, 63, 18, 0.28);
+  border: 1px solid rgba(251, 191, 36, 0.34);
+}
+
 @media (max-width: 720px) {
-  .hintDebugTitle {
+  .hintDebugTitle,
+  .debugSettingsTitle {
     display: grid;
   }
 
-  .hintDebugTitle .smallButton {
+  .hintDebugTitle .smallButton,
+  .debugSettingsTitle .smallButton {
     width: 100%;
   }
 
@@ -245,5 +322,10 @@
 
   .playHintText {
     max-height: 220px;
+  }
+
+  .debugActionRow,
+  .boardActionRow {
+    grid-template-columns: 1fr;
   }
 }
