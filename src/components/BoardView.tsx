@@ -529,15 +529,16 @@ export function BoardEditorView({ board, activeTool, showSolution = false, selec
       {activeTool === "blocked" && (
         <div className="selectionPanel obstacleSelectionPanel">
           <strong>Obstakel</strong>
-          <div className="tokenGrid" aria-label="Obstakels">
+          <div className="tokenGrid objectTokenGrid" aria-label="Obstakels">
             {DETECTIVE_OBSTACLES.map((obstacle) => (
               <button
                 key={obstacle.id}
                 type="button"
-                className={selectedObstacleType === obstacle.id ? "selectionToken activeSelectionToken" : "selectionToken"}
+                className={selectedObstacleType === obstacle.id ? "selectionToken obstacleSelectionToken activeSelectionToken" : "selectionToken obstacleSelectionToken"}
                 onClick={() => setSelectedObstacleType(obstacle.id)}
               >
-                {obstacle.name}
+                <ObjectIcon type={obstacle.id} kind="obstacle" className="objectTokenIcon obstacleTokenIcon" />
+                <span>{obstacle.name}</span>
               </button>
             ))}
           </div>
@@ -626,7 +627,11 @@ export function BoardEditorView({ board, activeTool, showSolution = false, selec
                   <ObjectIcon type={cell.objectType} />
                 </span>
               )}
-              {isBlocked && <span className="obstacleMarker">{obstacleDefinition?.shortLabel ?? "Stop"}</span>}
+              {isBlocked && (
+                <span className="obstacleMarker" title={obstacleDefinition?.name ?? "Stop"}>
+                  <ObjectIcon type={cell.obstacleType} kind="obstacle" />
+                </span>
+              )}
               {solutionLetter && (
                 <span className="solutionMarker" title={isMurderer ? `Moordenaar ${solutionLetter}` : `Oplossing ${solutionLetter}`}>
                   {solutionLetter}
