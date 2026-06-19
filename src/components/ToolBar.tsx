@@ -5,12 +5,14 @@ type ToolBarProps = {
   roomCount: number;
   activeCells: number;
   solutionReady: boolean;
+  hintCount: number;
   showSolution: boolean;
   onToolChange: (tool: BuilderToolMode) => void;
   onSave: () => void;
   onPlay: () => void;
   onNewBoard: () => void;
   onGenerateSolution: () => void;
+  onGenerateHints: () => void;
   onToggleSolution: () => void;
 };
 
@@ -27,12 +29,14 @@ export function ToolBar({
   roomCount,
   activeCells,
   solutionReady,
+  hintCount,
   showSolution,
   onToolChange,
   onSave,
   onPlay,
   onNewBoard,
   onGenerateSolution,
+  onGenerateHints,
   onToggleSolution
 }: ToolBarProps) {
   return (
@@ -41,17 +45,12 @@ export function ToolBar({
         <span>Kamers: <strong>{roomCount}</strong></span>
         <span>Cellen: <strong>{activeCells}</strong></span>
         <span>Oplossing: <strong>{solutionReady ? "ja" : "nee"}</strong></span>
+        <span>Hints: <strong>{hintCount}</strong></span>
       </div>
 
       <div className="toolGrid builderToolGrid">
         {tools.map((tool) => (
-          <button
-            className={activeTool === tool.id ? "toolButton active" : "toolButton"}
-            type="button"
-            key={tool.id}
-            onClick={() => onToolChange(tool.id)}
-            title={tool.help}
-          >
+          <button className={activeTool === tool.id ? "toolButton active" : "toolButton"} type="button" key={tool.id} onClick={() => onToolChange(tool.id)} title={tool.help}>
             <strong>{tool.label}</strong>
             <span>{tool.help}</span>
           </button>
@@ -60,6 +59,7 @@ export function ToolBar({
 
       <div className="buttonRow solutionActionRow">
         <button className="primaryButton" type="button" onClick={onGenerateSolution}>Genereer oplossing</button>
+        <button className="primaryButton" type="button" onClick={onGenerateHints} disabled={!solutionReady}>Genereer hints</button>
         <button className="ghostButton" type="button" onClick={onToggleSolution} disabled={!solutionReady}>{showSolution ? "Verberg oplossing" : "Toon oplossing"}</button>
       </div>
 
