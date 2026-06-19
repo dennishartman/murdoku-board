@@ -4,6 +4,7 @@ import { PlayBoardView } from "./components/PlayBoardView";
 import { SetupPanel } from "./components/SetupPanel";
 import { ToolBar } from "./components/ToolBar";
 import { createBoardForDifficulty, DEFAULT_DIFFICULTY, getBoardSizeRangeLabel, normalizeBoard, PLAY_LETTERS } from "./lib/boardModel";
+import { generateBetaHints } from "./lib/hintGenerator";
 import { describeSolution, generateSolution } from "./lib/solutionGenerator";
 import { loadBoard, saveBoard } from "./lib/storage";
 import type { BoardGrid, BuilderToolMode, PlayToolMode, PuzzleDifficulty } from "./types/board";
@@ -52,7 +53,8 @@ export function App() {
       const saved = await saveBoard(board, "Murdoku bord");
       const imageText = saved.board.referenceImageUrl ? " inclusief referentiefoto" : " zonder referentiefoto";
       const solutionText = saved.board.solution ? " inclusief verborgen oplossing" : " zonder verborgen oplossing";
-      setStatus(`Bord opgeslagen op dit apparaat${imageText}${solutionText}.`);
+      const hintText = saved.board.hints.length > 0 ? ` en ${saved.board.hints.length} hints` : "";
+      setStatus(`Bord opgeslagen op dit apparaat${imageText}${solutionText}${hintText}.`);
     } catch {
       setStatus("Opslaan is mislukt. Probeer eventueel de referentiefoto te verwijderen en bewaar opnieuw.");
     }
@@ -130,10 +132,29 @@ export function App() {
       return;
     }
 
-    const nextBoard = normalizeBoard({ ...normalizedBoard, solution: result.solution, murdererLetter: result.murdererLetter });
+    const nextBoard = normalizeBoard({ ...normalizedBoard, solution: result.solution, murdererLetter: result.murdererLetter, hints: [] });
     setBoard(nextBoard);
     setShowSolution(true);
     setStatus(`${result.message} Elke rij en kolom heeft precies 1 personage.`);
+  }
+
+  function handleGenerateHints() {
+    if (!board) {
+      return;
+    }
+
+    const normalizedBoard = normalizeBoard(board);
+    const result = generateBetaHints(normalizedBoard);
+
+    if (!result.ok) {
+      setBoard(normalizedBoard);
+      setStatus(result.message);
+      return;
+    }
+
+    const nextBoard = normalizeBoard({ ...normalizedBoard, hints: result.hints });
+    setBoard(nextBoard);
+    setStatus(`${result.message} Open de speelmodus en klik op Hints om ze te bekijken.`);
   }
 
   function handleBoardChange(nextBoard: BoardGrid) {
@@ -150,6 +171,7 @@ export function App() {
   const suspectCount = personCount > 0 ? Math.max(0, personCount - 1) : 0;
   const solutionRows = board ? describeSolution(board) : [];
   const murdererRow = solutionRows.find((entry) => entry.isMurderer);
+  const hintCount = board?.hints.length ?? 0;
 
   return (
     <main className={mode === "play" ? "appShell playShell" : "appShell"}>
@@ -203,6 +225,7 @@ export function App() {
             roomCount={board.rooms.length}
             activeCells={activeCells}
             solutionReady={Boolean(board.solution)}
+            hintCount={hintCount}
             showSolution={showSolution}
             onToolChange={(tool) => {
               setActiveBuilderTool(tool);
@@ -212,6 +235,7 @@ export function App() {
             onPlay={handlePlayBoard}
             onNewBoard={handleNewBoard}
             onGenerateSolution={handleGenerateSolution}
+            onGenerateHints={handleGenerateHints}
             onToggleSolution={() => setShowSolution((value) => !value)}
           />
 
