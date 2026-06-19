@@ -149,6 +149,26 @@ function describeDirection(direction: "above" | "below" | "left_of" | "right_of"
   return "rechts van";
 }
 
+function describeDirectionAxis(direction: "above" | "below" | "left_of" | "right_of") {
+  return direction === "left_of" || direction === "right_of" ? "rij" : "kolom";
+}
+
+function describeDirectionSuffix(direction: "above" | "below" | "left_of" | "right_of") {
+  if (direction === "above") {
+    return "daarboven";
+  }
+
+  if (direction === "below") {
+    return "daaronder";
+  }
+
+  if (direction === "left_of") {
+    return "links daarvan";
+  }
+
+  return "rechts daarvan";
+}
+
 function describeDistanceRelation(relation: "exactly" | "not_exactly" | "at_least" | "at_most") {
   if (relation === "not_exactly") {
     return "niet precies";
@@ -218,8 +238,15 @@ export function describeHint(hint: Hint, board: BoardGrid, activeCharacters: Act
   }
 
   if (hint.type === "direction") {
-    const relationText = hint.relation === "is" ? "staat" : "staat niet";
-    return `${describeSubject(hint.subject, activeCharacters)} ${relationText} ${describeDirection(hint.direction)} ${describeTarget(hint.target, activeCharacters, board)}.`;
+    const subjectText = describeSubject(hint.subject, activeCharacters);
+    const targetText = describeTarget(hint.target, activeCharacters, board);
+    const axisText = describeDirectionAxis(hint.direction);
+
+    if (hint.relation === "is") {
+      return `${subjectText} staat in dezelfde ${axisText} als ${targetText} en staat ${describeDirectionSuffix(hint.direction)}.`;
+    }
+
+    return `${subjectText} staat niet in dezelfde ${axisText} ${describeDirection(hint.direction)} ${targetText}.`;
   }
 
   if (hint.type === "room_group_count") {
