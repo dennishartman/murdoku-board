@@ -152,10 +152,29 @@ export function PlayBoardView({
 
     if (activeTool === "final") {
       const targetCell = board.cells.find((cell) => cell.row === row && cell.col === col);
-      const selectedLetterAlreadyPlaced = board.cells.some((cell) => cell.finalLetter === selectedLetter && (cell.row !== row || cell.col !== col));
 
-      if (targetCell?.finalLetter !== selectedLetter && selectedLetterAlreadyPlaced) {
+      if (!targetCell) {
+        return;
+      }
+
+      const isRemovingSameLetter = targetCell.finalLetter === selectedLetter;
+      const selectedLetterAlreadyPlaced = board.cells.some((cell) => cell.finalLetter === selectedLetter && (cell.row !== row || cell.col !== col));
+      const rowOrColumnAlreadyHasFinal = board.cells.some(
+        (cell) => Boolean(cell.finalLetter) && (cell.row !== row || cell.col !== col) && (cell.row === row || cell.col === col)
+      );
+
+      if (!isRemovingSameLetter && selectedLetterAlreadyPlaced) {
         showToast(`Letter ${selectedLetter} is al geplaatst.`);
+        return;
+      }
+
+      if (!isRemovingSameLetter && rowOrColumnAlreadyHasFinal) {
+        showToast("Deze rij of kolom heeft al een personage.");
+        return;
+      }
+
+      if (!isRemovingSameLetter && targetCell.isCrossed) {
+        showToast("Deze cel is uitgesloten.");
         return;
       }
 
