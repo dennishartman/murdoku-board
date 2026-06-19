@@ -17,6 +17,14 @@ function genderLabel(gender: CharacterGender, count = 2) {
   return count === 1 ? genderSingular[gender] : genderPlural[gender];
 }
 
+function lowerFirst(value: string) {
+  if (value.length === 0) {
+    return value;
+  }
+
+  return `${value.slice(0, 1).toLowerCase()}${value.slice(1)}`;
+}
+
 function describeSubject(subject: HintSubject, activeCharacters: ActiveCharacterSet) {
   if (subject.kind === "character") {
     return activeCharacters[subject.letter]?.name ?? subject.letter;
@@ -36,14 +44,14 @@ function describeTarget(target: HintTarget, activeCharacters: ActiveCharacterSet
 
   if (target.kind === "object") {
     if (target.objectType) {
-      return `de ${getObjectDefinition(target.objectType)?.name.toLowerCase() ?? "het object"}`;
+      return `de ${getObjectDefinition(target.objectType)?.name.toLowerCase() ?? "object"}`;
     }
 
     return "een object";
   }
 
   if (target.obstacleType) {
-    return `de ${getObstacleDefinition(target.obstacleType)?.name.toLowerCase() ?? "het obstakel"}`;
+    return `de ${getObstacleDefinition(target.obstacleType)?.name.toLowerCase() ?? "obstakel"}`;
   }
 
   return "een obstakel";
@@ -53,7 +61,7 @@ function describeRoom(board: BoardGrid, roomId: string) {
   const room = board.rooms.find((candidate) => candidate.id === roomId);
 
   if (room?.name) {
-    return room.name;
+    return `de ${lowerFirst(room.name)}`;
   }
 
   const index = board.rooms.findIndex((candidate) => candidate.id === roomId);
