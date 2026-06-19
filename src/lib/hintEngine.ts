@@ -1,3 +1,4 @@
+import { getObjectDefinition } from "./themeContent";
 import type { ActiveCharacterSet, BoardGrid, CharacterGender, Hint, HintSubject, HintTarget } from "../types/board";
 
 const genderSingular: Record<CharacterGender, string> = {
@@ -33,11 +34,21 @@ function describeTarget(target: HintTarget, activeCharacters: ActiveCharacterSet
     return `een ${genderSingular[target.gender]}`;
   }
 
+  if (target.objectType) {
+    return `de ${getObjectDefinition(target.objectType)?.name.toLowerCase() ?? "het object"}`;
+  }
+
   return "een object";
 }
 
 function describeRoom(board: BoardGrid, roomId: string) {
-  const index = board.rooms.findIndex((room) => room.id === roomId);
+  const room = board.rooms.find((candidate) => candidate.id === roomId);
+
+  if (room?.name) {
+    return room.name;
+  }
+
+  const index = board.rooms.findIndex((candidate) => candidate.id === roomId);
 
   if (index >= 0) {
     return `kamer ${index + 1}`;
