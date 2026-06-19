@@ -10,6 +10,8 @@ export type PlayLetter = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "V";
 
 export type CharacterGender = "male" | "female" | "neutral";
 
+export type CharacterRole = "suspect" | "victim";
+
 export type CharacterTheme = {
   id: string;
   name: string;
@@ -22,6 +24,7 @@ export type CharacterProfile = {
   letter: PlayLetter;
   name: string;
   gender: CharacterGender;
+  role?: CharacterRole;
   portraitUrl: string | null;
   accentColor: string;
 };
@@ -32,6 +35,7 @@ export type ActiveCharacter = {
   letter: PlayLetter;
   name: string;
   gender: CharacterGender;
+  role: CharacterRole;
   portraitUrl: string | null;
   accentColor: string;
 };
@@ -151,6 +155,7 @@ export type BoardGrid = {
   horizontalWalls: boolean[][];
   referenceImageUrl: string | null;
   selectedThemeId: string;
+  activeLetters: PlayLetter[];
   activeCharacters: ActiveCharacterSet;
   hints: Hint[];
 };
