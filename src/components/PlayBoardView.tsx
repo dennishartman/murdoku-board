@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { clearCellPlay, DEFAULT_ROOM_COLOR, hasBoundary, PLAY_LETTERS, toggleCellCross, toggleCellFinalLetter, toggleCellLetter } from "../lib/boardModel";
 import { ensureActiveCharacterSet } from "../lib/characterPool";
 import { describeHints } from "../lib/hintEngine";
+import { getObjectDefinition, getObstacleDefinition } from "../lib/themeContent";
 import type { BoardGrid, PlayLetter, PlayToolMode } from "../types/board";
 
 type PlayBoardViewProps = {
@@ -37,6 +38,25 @@ function roomColor(board: BoardGrid, roomId: string | null) {
   }
 
   return board.rooms.find((room) => room.id === roomId)?.color ?? DEFAULT_ROOM_COLOR;
+}
+
+function roomName(board: BoardGrid, roomId: string | null) {
+  if (!roomId) {
+    return null;
+  }
+
+  return board.rooms.find((room) => room.id === roomId)?.name ?? null;
+}
+
+function isRoomLabelAnchor(board: BoardGrid, roomId: string | null, row: number, col: number) {
+  if (!roomId) {
+    return false;
+  }
+
+  const room = board.rooms.find((candidate) => candidate.id === roomId);
+  const firstCell = room?.cells.slice().sort(([rowA, colA], [rowB, colB]) => rowA - rowB || colA - colB)[0];
+
+  return Boolean(firstCell && firstCell[0] === row && firstCell[1] === col);
 }
 
 function wallClass(board: BoardGrid, row: number, col: number, side: "top" | "right" | "bottom" | "left") {
@@ -212,7 +232,7 @@ export function PlayBoardView({
     <section className="playScreen">
       <div className="playHeader">
         <div>
-          <p className="eyebrow compactEyebrow">Speelmodus beta 2</p>
+          <p className="eyebrow compactEyebrow">Speelmodus beta 3</p>
           <h2>Vul het bord in</h2>
           <p>{activeCells} actieve cellen. {suspectCount} verdachten en 1 slachtoffer. Kies een personage en tik daarna op een cel.</p>
         </div>
@@ -226,10 +246,7 @@ export function PlayBoardView({
       {toastMessage && <div className="playToast" role="status">{toastMessage}</div>}
 
       <div className="playBoardWrap">
-        <div
-          className="manualBoard playBoard"
-          style={boardStyle}
-        >
+        <div className="manualBoard playBoard" style={boardStyle}>
           {board.cells.map((cell) => {
             if (!cell.isActive) {
               return <div key={`${cell.row}-${cell.col}`} className="manualCell inactiveCell playCell" />;
@@ -237,6 +254,9 @@ export function PlayBoardView({
 
             const isBlocked = cell.isBlocked;
             const isObject = cell.isObject;
+            const objectDefinition = getObjectDefinition(cell.objectType);
+            const obstacleDefinition = getObstacleDefinition(cell.obstacleType);
+            const showRoomName = isRoomLabelAnchor(board, cell.roomId, cell.row, cell.col);
             const style: CSSProperties = {
               backgroundColor: isBlocked ? "#9ca3af" : roomColor(board, cell.roomId),
               ...cellBorderStyle(board, cell.row, cell.col)
@@ -264,7 +284,9 @@ export function PlayBoardView({
                   }
                 }}
               >
-                {isObject && <span className="objectMarker" />}
+                {showRoomName && <span className="roomNameLabel playRoomNameLabel">{roomName(board, cell.roomId)}</span>}
+                {isObject && <span className="objectMarker playObjectMarker">{objectDefinition?.shortLabel ?? "Obj"}</span>}
+                {isBlocked && <span className="obstacleMarker playObstacleMarker">{obstacleDefinition?.shortLabel ?? "Stop"}</span>}
                 {!isBlocked && !cell.isCrossed && cell.finalLetter && (
                   <span className="finalLetter" aria-hidden="true">{cell.finalLetter}</span>
                 )}
