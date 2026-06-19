@@ -27,8 +27,6 @@ type PartialBuildResult = {
   placedSuspects: Set<PlayLetter>;
 };
 
-const SUSPECT_LETTERS: PlayLetter[] = ["A", "B", "C", "D", "E", "F", "G", "H"];
-
 function getSuspectLetters(board: BoardGrid) {
   return board.activeLetters.filter((letter) => letter !== "V") as PlayLetter[];
 }
@@ -47,14 +45,6 @@ function getCellRoomId(board: BoardGrid, position: SolutionPosition | null | und
   }
 
   return getCell(board, position.row, position.col)?.roomId ?? null;
-}
-
-function getRoomName(board: BoardGrid, roomId: string | null) {
-  if (!roomId) {
-    return null;
-  }
-
-  return board.rooms.find((room) => room.id === roomId)?.name ?? roomId;
 }
 
 function isValidPersonCell(cell: BoardCell | null) {
