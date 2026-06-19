@@ -8,6 +8,8 @@ export type EdgeSide = "top" | "right" | "bottom" | "left";
 
 export type PlayLetter = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "V";
 
+export type PuzzleDifficulty = "easy" | "normal" | "hard";
+
 export type CharacterGender = "male" | "female" | "neutral";
 
 export type CharacterRole = "suspect" | "victim";
@@ -155,6 +157,8 @@ export type BoardGrid = {
   horizontalWalls: boolean[][];
   referenceImageUrl: string | null;
   selectedThemeId: string;
+  difficulty: PuzzleDifficulty;
+  maxCharacters: number;
   activeLetters: PlayLetter[];
   activeCharacters: ActiveCharacterSet;
   hints: Hint[];
