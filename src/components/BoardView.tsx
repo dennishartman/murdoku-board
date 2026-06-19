@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from "react";
-import { applyBuilderTool, DEFAULT_ROOM_COLOR, getCell, hasBoundary, ROOM_COLORS, setEdgeBoundary } from "../lib/boardModel";
-import type { BoardGrid, BuilderToolMode, EdgeSide, PlayLetter } from "../types/board";
+import { applyBuilderTool, DEFAULT_ROOM_COLOR, getCell, hasBoundary, setEdgeBoundary } from "../lib/boardModel";
+import { DETECTIVE_OBSTACLES, DETECTIVE_OBJECTS, DETECTIVE_ROOMS, getObjectDefinition, getObstacleDefinition } from "../lib/themeContent";
+import type { BoardGrid, BoardObjectTypeId, BoardObstacleTypeId, BuilderToolMode, EdgeSide, PlayLetter } from "../types/board";
 
 type BoardEditorViewProps = {
   board: BoardGrid;
@@ -27,6 +28,14 @@ function roomColor(board: BoardGrid, roomId: string | null) {
   }
 
   return board.rooms.find((room) => room.id === roomId)?.color ?? DEFAULT_ROOM_COLOR;
+}
+
+function roomName(board: BoardGrid, roomId: string | null) {
+  if (!roomId) {
+    return null;
+  }
+
+  return board.rooms.find((room) => room.id === roomId)?.name ?? null;
 }
 
 function wallClass(board: BoardGrid, row: number, col: number, side: EdgeSide) {
@@ -121,11 +130,25 @@ function getSolutionLetter(board: BoardGrid, row: number, col: number): PlayLett
   return null;
 }
 
+function isRoomLabelAnchor(board: BoardGrid, roomId: string | null, row: number, col: number) {
+  if (!roomId) {
+    return false;
+  }
+
+  const room = board.rooms.find((candidate) => candidate.id === roomId);
+  const firstCell = room?.cells.slice().sort(([rowA, colA], [rowB, colB]) => rowA - rowB || colA - colB)[0];
+
+  return Boolean(firstCell && firstCell[0] === row && firstCell[1] === col);
+}
+
 export function BoardEditorView({ board, activeTool, showSolution = false, onBoardChange }: BoardEditorViewProps) {
-  const [selectedColor, setSelectedColor] = useState(ROOM_COLORS[0]);
+  const [selectedRoomId, setSelectedRoomId] = useState(DETECTIVE_ROOMS[0]?.id ?? "living_room");
+  const [selectedObjectType, setSelectedObjectType] = useState<BoardObjectTypeId>(DETECTIVE_OBJECTS[0]?.id ?? "chair");
+  const [selectedObstacleType, setSelectedObstacleType] = useState<BoardObstacleTypeId>(DETECTIVE_OBSTACLES[0]?.id ?? "table");
   const activeCells = useMemo(() => board.cells.filter((cell) => cell.isActive).length, [board.cells]);
   const latestBoardRef = useRef(board);
   const dragStateRef = useRef<WallDragState>({ active: false, value: false, lastKey: null, orientation: null, lineIndex: null });
+  const selectedRoom = DETECTIVE_ROOMS.find((room) => room.id === selectedRoomId) ?? DETECTIVE_ROOMS[0];
 
   useEffect(() => {
     latestBoardRef.current = board;
@@ -155,7 +178,18 @@ export function BoardEditorView({ board, activeTool, showSolution = false, onBoa
       return;
     }
 
-    publishBoard(applyBuilderTool(latestBoardRef.current, row, col, activeTool, selectedColor));
+    publishBoard(
+      applyBuilderTool(
+        latestBoardRef.current,
+        row,
+        col,
+        activeTool,
+        selectedRoom?.color ?? DEFAULT_ROOM_COLOR,
+        selectedRoom?.name ?? "Kamer",
+        selectedObjectType,
+        selectedObstacleType
+      )
+    );
   }
 
   function applyEdge(row: number, col: number, side: EdgeSide, value: boolean) {
@@ -245,24 +279,58 @@ export function BoardEditorView({ board, activeTool, showSolution = false, onBoa
       )}
 
       {activeTool === "color" && (
-        <div className="colorPanel">
-          <div className="colorPalette" aria-label="Kamer kleur">
-            {ROOM_COLORS.map((color, index) => (
+        <div className="selectionPanel">
+          <strong>Kamernaam</strong>
+          <div className="tokenGrid roomTokenGrid" aria-label="Kamernamen">
+            {DETECTIVE_ROOMS.map((room) => (
               <button
-                key={color}
+                key={room.id}
                 type="button"
-                className={selectedColor === color ? "colorDot selected" : "colorDot"}
-                style={{ backgroundColor: color }}
-                onClick={() => setSelectedColor(color)}
-                aria-label={`Standaard kleur ${index + 1}`}
-              />
+                className={selectedRoomId === room.id ? "selectionToken activeSelectionToken" : "selectionToken"}
+                style={{ borderColor: room.color }}
+                onClick={() => setSelectedRoomId(room.id)}
+              >
+                <span className="tokenColor" style={{ backgroundColor: room.color }} />
+                {room.name}
+              </button>
             ))}
           </div>
+        </div>
+      )}
 
-          <label className="customColorPicker">
-            Eigen kleur
-            <input type="color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)} />
-          </label>
+      {activeTool === "object" && (
+        <div className="selectionPanel">
+          <strong>Object voor hints</strong>
+          <div className="tokenGrid" aria-label="Objecten">
+            {DETECTIVE_OBJECTS.map((object) => (
+              <button
+                key={object.id}
+                type="button"
+                className={selectedObjectType === object.id ? "selectionToken activeSelectionToken" : "selectionToken"}
+                onClick={() => setSelectedObjectType(object.id)}
+              >
+                {object.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTool === "blocked" && (
+        <div className="selectionPanel obstacleSelectionPanel">
+          <strong>Obstakel</strong>
+          <div className="tokenGrid" aria-label="Obstakels">
+            {DETECTIVE_OBSTACLES.map((obstacle) => (
+              <button
+                key={obstacle.id}
+                type="button"
+                className={selectedObstacleType === obstacle.id ? "selectionToken activeSelectionToken" : "selectionToken"}
+                onClick={() => setSelectedObstacleType(obstacle.id)}
+              >
+                {obstacle.name}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -292,8 +360,11 @@ export function BoardEditorView({ board, activeTool, showSolution = false, onBoa
         {board.cells.map((cell) => {
           const isBlocked = cell.isActive && cell.isBlocked;
           const isObject = cell.isActive && cell.isObject;
+          const objectDefinition = getObjectDefinition(cell.objectType);
+          const obstacleDefinition = getObstacleDefinition(cell.obstacleType);
           const solutionLetter = showSolution && cell.isActive ? getSolutionLetter(board, cell.row, cell.col) : null;
           const isMurderer = Boolean(solutionLetter && board.murdererLetter === solutionLetter);
+          const showRoomName = cell.isActive && isRoomLabelAnchor(board, cell.roomId, cell.row, cell.col);
           const cellStyle: CSSProperties = cell.isActive
             ? {
                 backgroundColor: isBlocked ? "#9ca3af" : roomColor(board, cell.roomId),
@@ -331,7 +402,9 @@ export function BoardEditorView({ board, activeTool, showSolution = false, onBoa
                 }
               }}
             >
-              {isObject && <span className="objectMarker" />}
+              {showRoomName && <span className="roomNameLabel">{roomName(board, cell.roomId)}</span>}
+              {isObject && <span className="objectMarker">{objectDefinition?.shortLabel ?? "Obj"}</span>}
+              {isBlocked && <span className="obstacleMarker">{obstacleDefinition?.shortLabel ?? "Stop"}</span>}
               {solutionLetter && (
                 <span className="solutionMarker" title={isMurderer ? `Moordenaar ${solutionLetter}` : `Oplossing ${solutionLetter}`}>
                   {solutionLetter}
@@ -355,9 +428,9 @@ export function BoardEditorView({ board, activeTool, showSolution = false, onBoa
         <ol>
           <li>Vorm: verwijder cellen die niet bij het bord horen.</li>
           <li>Rand: klik of sleep tussen cellen om kamergrenzen te tekenen.</li>
-          <li>Kleur: klik een kamer aan om die kamer een kleur te geven.</li>
-          <li>Object: klik beschikbare objectcellen aan. Deze krijgen een afgerond vierkant.</li>
-          <li>Stop: klik cellen met obstakels aan. Deze worden grijs in het speelbord.</li>
+          <li>Kamer: kies een kamernaam en klik een kamer aan.</li>
+          <li>Object: kies een object en klik cellen aan die hints mogen gebruiken.</li>
+          <li>Stop: kies een obstakel en klik cellen aan waar niemand mag staan.</li>
         </ol>
       </div>
     </section>
