@@ -130,7 +130,7 @@ export function App() {
       return;
     }
 
-    const nextBoard = normalizeBoard({ ...normalizedBoard, solution: result.solution });
+    const nextBoard = normalizeBoard({ ...normalizedBoard, solution: result.solution, murdererLetter: result.murdererLetter });
     setBoard(nextBoard);
     setShowSolution(true);
     setStatus(`${result.message} Elke rij en kolom heeft precies 1 personage.`);
@@ -149,6 +149,7 @@ export function App() {
   const personCount = board?.activeLetters.length ?? 0;
   const suspectCount = personCount > 0 ? Math.max(0, personCount - 1) : 0;
   const solutionRows = board ? describeSolution(board) : [];
+  const murdererRow = solutionRows.find((entry) => entry.isMurderer);
 
   return (
     <main className={mode === "play" ? "appShell playShell" : "appShell"}>
@@ -220,17 +221,19 @@ export function App() {
                 <span>3</span>
                 <div>
                   <h2>Verborgen oplossing</h2>
-                  <p>Debugweergave voor het testen. Dezelfde letters worden ook op het bord geprojecteerd.</p>
+                  <p>
+                    Debugweergave voor het testen. {murdererRow ? `${murdererRow.name} is de moordenaar en staat bij het slachtoffer in kamer ${murdererRow.roomId?.replace("room-", "") ?? "?"}.` : "De moordenaar wordt rood gemarkeerd zodra de oplossing bekend is."}
+                  </p>
                 </div>
               </div>
 
               <div className="solutionGrid">
                 {solutionRows.map((entry) => (
-                  <div className="solutionItem" key={entry.letter}>
+                  <div className={entry.isMurderer ? "solutionItem murdererSolutionItem" : "solutionItem"} key={entry.letter}>
                     <strong>{entry.letter}</strong>
                     <span>{entry.name}</span>
-                    <small>{entry.role === "victim" ? "slachtoffer" : "verdachte"}</small>
-                    <em>Rij {entry.row}, kolom {entry.col}</em>
+                    <small>{entry.role === "victim" ? "slachtoffer" : entry.isMurderer ? "moordenaar" : "verdachte"}</small>
+                    <em>Rij {entry.row}, kolom {entry.col}, kamer {entry.roomId?.replace("room-", "") ?? "?"}</em>
                   </div>
                 ))}
               </div>
