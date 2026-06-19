@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEve
 import { applyBuilderTool, DEFAULT_ROOM_COLOR, getCell, hasBoundary, setEdgeBoundary } from "../lib/boardModel";
 import { DETECTIVE_OBSTACLES, DETECTIVE_OBJECTS, DETECTIVE_ROOMS, getObjectDefinition, getObstacleDefinition } from "../lib/themeContent";
 import type { BoardCell, BoardGrid, BoardObjectTypeId, BoardObstacleTypeId, BuilderToolMode, EdgeSide, Hint, HintTarget, PlayLetter, SolutionPosition } from "../types/board";
+import { ObjectIcon } from "./ObjectIcon";
 
 type BoardEditorViewProps = {
   board: BoardGrid;
@@ -509,15 +510,16 @@ export function BoardEditorView({ board, activeTool, showSolution = false, selec
       {activeTool === "object" && (
         <div className="selectionPanel">
           <strong>Object voor hints</strong>
-          <div className="tokenGrid" aria-label="Objecten">
+          <div className="tokenGrid objectTokenGrid" aria-label="Objecten">
             {DETECTIVE_OBJECTS.map((object) => (
               <button
                 key={object.id}
                 type="button"
-                className={selectedObjectType === object.id ? "selectionToken activeSelectionToken" : "selectionToken"}
+                className={selectedObjectType === object.id ? "selectionToken objectSelectionToken activeSelectionToken" : "selectionToken objectSelectionToken"}
                 onClick={() => setSelectedObjectType(object.id)}
               >
-                {object.name}
+                <ObjectIcon type={object.id} className="objectTokenIcon" />
+                <span>{object.name}</span>
               </button>
             ))}
           </div>
@@ -619,7 +621,11 @@ export function BoardEditorView({ board, activeTool, showSolution = false, selec
               }}
             >
               {showRoomName && <span className="roomNameLabel">{roomName(board, cell.roomId)}</span>}
-              {isObject && <span className="objectMarker">{objectDefinition?.shortLabel ?? "Obj"}</span>}
+              {isObject && (
+                <span className="objectMarker" title={objectDefinition?.name ?? "Object"}>
+                  <ObjectIcon type={cell.objectType} />
+                </span>
+              )}
               {isBlocked && <span className="obstacleMarker">{obstacleDefinition?.shortLabel ?? "Stop"}</span>}
               {solutionLetter && (
                 <span className="solutionMarker" title={isMurderer ? `Moordenaar ${solutionLetter}` : `Oplossing ${solutionLetter}`}>
