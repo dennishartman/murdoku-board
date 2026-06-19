@@ -154,6 +154,47 @@ function sanitizePlayLetters(board: BoardGrid) {
   return board;
 }
 
+function isSolutionCellValid(board: BoardGrid, row: number, col: number) {
+  const cell = board.cells.find((candidate) => candidate.row === row && candidate.col === col);
+  return Boolean(cell?.isActive && !cell.isBlocked && !cell.isObject);
+}
+
+function sanitizeSolution(board: BoardGrid) {
+  if (!board.solution) {
+    return board;
+  }
+
+  const activeLetterSet = new Set(board.activeLetters);
+  const usedRows = new Set<number>();
+  const usedCols = new Set<number>();
+
+  for (const letter of board.activeLetters) {
+    const position = board.solution[letter];
+
+    if (!position || !isSolutionCellValid(board, position.row, position.col)) {
+      board.solution = null;
+      return board;
+    }
+
+    if (usedRows.has(position.row) || usedCols.has(position.col)) {
+      board.solution = null;
+      return board;
+    }
+
+    usedRows.add(position.row);
+    usedCols.add(position.col);
+  }
+
+  for (const key of Object.keys(board.solution)) {
+    if (!activeLetterSet.has(key as PlayLetter)) {
+      board.solution = null;
+      return board;
+    }
+  }
+
+  return board;
+}
+
 function isActivePlayLetter(board: BoardGrid, letter: string) {
   return board.activeLetters.includes(letter as PlayLetter);
 }
@@ -191,6 +232,7 @@ export function normalizeBoard(board: BoardGrid): BoardGrid {
     maxCharacters,
     activeLetters: calculateActiveLetters(board.rows, board.cols, normalizedCells, difficulty),
     activeCharacters: ensureActiveCharacterSet(selectedThemeId, board.activeCharacters),
+    solution: board.solution ?? null,
     hints: Array.isArray(board.hints) ? [...board.hints] : [],
     cells: normalizedCells,
     rooms: (board.rooms ?? []).map((room) => ({ ...room, cells: room.cells.map(([row, col]) => [row, col] as [number, number]) })),
@@ -198,7 +240,7 @@ export function normalizeBoard(board: BoardGrid): BoardGrid {
     horizontalWalls: board.horizontalWalls.map((line) => [...line])
   };
 
-  return sanitizePlayLetters(normalizedBoard);
+  return sanitizeSolution(sanitizePlayLetters(normalizedBoard));
 }
 
 function cloneBoard(board: BoardGrid): BoardGrid {
@@ -206,7 +248,7 @@ function cloneBoard(board: BoardGrid): BoardGrid {
 }
 
 function recalculateAutoCrosses(board: BoardGrid) {
-  sanitizePlayLetters(board);
+  sanitizeSolution(sanitizePlayLetters(board));
 
   for (const cell of board.cells) {
     cell.autoCrossSources = [];
@@ -262,6 +304,7 @@ export function createBoard(rows: number, cols: number, referenceImageUrl: strin
     maxCharacters,
     activeLetters,
     activeCharacters: createActiveCharacterSet(selectedThemeId),
+    solution: null,
     hints: []
   };
 
@@ -425,6 +468,7 @@ export function toggleCellActive(input: BoardGrid, row: number, col: number) {
   cell.autoCrossSources = [];
   cell.finalLetter = null;
   cell.playMarks = makeEmptyMarks();
+  board.solution = null;
   return recalculateRooms(board);
 }
 
@@ -477,6 +521,7 @@ export function applyBuilderTool(input: BoardGrid, row: number, col: number, too
     if (cell.isObject) {
       cell.isBlocked = false;
     }
+    board.solution = null;
     return recalculateRooms(board);
   }
 
@@ -490,6 +535,7 @@ export function applyBuilderTool(input: BoardGrid, row: number, col: number, too
     cell.autoCrossSources = [];
     cell.finalLetter = null;
     cell.playMarks = makeEmptyMarks();
+    board.solution = null;
     board.maxCharacters = calculateMaxCharacters(board.rows, board.cols, board.cells);
     board.activeLetters = calculateActiveLetters(board.rows, board.cols, board.cells, board.difficulty);
     return recalculateAutoCrosses(board);
