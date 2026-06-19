@@ -1,4 +1,4 @@
-import type { BoardCell, BoardGrid, CharacterGender, Hint, HintTarget, PlayLetter, SolutionPosition } from "../types/board";
+import type { BoardGrid, CharacterGender, Hint, HintSubject, HintTarget, PlayLetter, SolutionPosition } from "../types/board";
 
 type PositionedLetter = {
   letter: PlayLetter;
@@ -38,10 +38,6 @@ function shuffle<T>(items: T[]) {
   }
 
   return result;
-}
-
-function shuffledHintBucket(hints: Hint[]) {
-  return shuffle<Hint>(hints);
 }
 
 function uniqueHints(hints: Hint[]) {
@@ -141,6 +137,22 @@ function getTargets(board: BoardGrid): TargetCell[] {
   }
 
   return result;
+}
+
+function subjectLetter(subject: HintSubject | undefined) {
+  return subject?.kind === "character" ? subject.letter : null;
+}
+
+function hintSubjectLetter(hint: Hint) {
+  if (hint.type === "murderer_room") {
+    return hint.victimLetter;
+  }
+
+  if (hint.type === "room_group_count") {
+    return subjectLetter(hint.subject);
+  }
+
+  return subjectLetter(hint.subject);
 }
 
 function addRoomHints(board: BoardGrid, positions: PositionedLetter[], hints: Hint[]) {
@@ -337,76 +349,66 @@ function addMurdererSupportHints(board: BoardGrid, positions: PositionedLetter[]
   }
 
   hints.push({
-    id: `victim-room-${victim.roomId}`,
-    type: "room",
-    subject: { kind: "character", letter: "V" },
-    roomId: victim.roomId,
-    relation: "is_in"
+    id: "victim-murderer-room",
+    type: "murderer_room",
+    victimLetter: "V"
   });
-
-  const murdererGender = board.activeCharacters[murderer.letter]?.gender;
-
-  if (murdererGender) {
-    hints.push({
-      id: `murderer-gender-count-${victim.roomId}-${murdererGender}`,
-      type: "room_group_count",
-      subject: { kind: "character", letter: "V" },
-      roomId: victim.roomId,
-      group: { kind: "gender", gender: murdererGender },
-      countMode: "other_than_subject",
-      count: positions.filter((position) => position.roomId === victim.roomId && position.letter !== "V" && board.activeCharacters[position.letter]?.gender === murdererGender).length
-    });
-  }
 }
 
-function selectHintTargetCount(board: BoardGrid) {
-  if (board.difficulty === "easy") {
-    return 8;
+function hintPriority(hint: Hint) {
+  if (hint.type === "adjacent" || hint.type === "diagonal") {
+    return 1;
   }
 
-  if (board.difficulty === "hard") {
-    return 14;
+  if (hint.type === "room") {
+    return 2;
   }
 
-  return 11;
+  if (hint.type === "edge") {
+    return 3;
+  }
+
+  if (hint.type === "distance" || hint.type === "direction") {
+    return 4;
+  }
+
+  if (hint.type === "room_group_count") {
+    return 5;
+  }
+
+  if (hint.type === "row_column") {
+    return 6;
+  }
+
+  return 0;
+}
+
+function selectOneHintForLetter(letter: PlayLetter, candidates: Hint[]) {
+  const letterHints = shuffle(candidates.filter((hint) => hintSubjectLetter(hint) === letter && hint.type !== "murderer_room"));
+
+  if (letterHints.length === 0) {
+    return null;
+  }
+
+  return letterHints.sort((a, b) => hintPriority(a) - hintPriority(b))[0] ?? null;
 }
 
 function selectBetaHints(board: BoardGrid, candidates: Hint[]) {
-  const targetCount = Math.min(candidates.length, selectHintTargetCount(board));
-  const requiredHints = candidates.filter((hint) => hint.id.startsWith("victim-room-") || hint.id.startsWith("murderer-gender-count-"));
-  const softHints = candidates.filter((hint) => !requiredHints.includes(hint));
   const selected: Hint[] = [];
+  const victimHint = candidates.find((hint) => hint.type === "murderer_room" && hint.victimLetter === "V");
 
-  for (const hint of requiredHints) {
-    if (selected.length < targetCount) {
-      selected.push(hint);
-    }
+  if (board.activeLetters.includes("V") && victimHint) {
+    selected.push(victimHint);
   }
 
-  const roomHints: Hint[] = softHints.filter((hint) => hint.type === "room");
-  const relationHints: Hint[] = softHints.filter((hint) => hint.type === "adjacent" || hint.type === "diagonal");
-  const edgeHints: Hint[] = softHints.filter((hint) => hint.type === "edge");
-  const genderHints: Hint[] = softHints.filter((hint) => hint.type === "room_group_count");
-  const distanceHints: Hint[] = softHints.filter((hint) => hint.type === "distance" || hint.type === "direction");
-  const rowColumnHints: Hint[] = softHints.filter((hint) => hint.type === "row_column");
+  for (const letter of board.activeLetters) {
+    if (letter === "V") {
+      continue;
+    }
 
-  const buckets: Hint[][] = [
-    shuffledHintBucket(roomHints),
-    shuffledHintBucket(relationHints),
-    shuffledHintBucket(edgeHints),
-    shuffledHintBucket(genderHints),
-    shuffledHintBucket(distanceHints),
-    shuffledHintBucket(rowColumnHints)
-  ];
+    const hint = selectOneHintForLetter(letter, candidates);
 
-  while (selected.length < targetCount && buckets.some((bucket) => bucket.length > 0)) {
-    for (const bucket of buckets) {
-      const hint = bucket.shift();
-
-      if (!hint || selected.length >= targetCount) {
-        continue;
-      }
-
+    if (hint) {
       selected.push(hint);
     }
   }
@@ -455,10 +457,19 @@ export function generateBetaHints(board: BoardGrid): GenerateHintsResult {
 
   const hints = selectBetaHints(board, candidates);
 
+  if (hints.length !== board.activeLetters.length) {
+    return {
+      ok: false,
+      hints: [],
+      candidateCount: candidates.length,
+      message: "Niet elk personage kreeg precies 1 hint. Pas het bord aan of genereer de oplossing opnieuw."
+    };
+  }
+
   return {
     ok: true,
     hints,
     candidateCount: candidates.length,
-    message: `${hints.length} hints gegenereerd uit ${candidates.length} mogelijke hints.`
+    message: `${hints.length} hints gegenereerd: precies 1 hint per personage.`
   };
 }
