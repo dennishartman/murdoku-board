@@ -12,10 +12,6 @@ export type HintProgressScore = {
   domainReduction: number;
 };
 
-function countKeys(value: Record<string, unknown>) {
-  return Object.keys(value).length;
-}
-
 function roomCount(state: MurderGoalState) {
   return Object.keys(state.knownRooms).length;
 }
