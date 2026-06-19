@@ -9,8 +9,9 @@
 }
 
 .characterRow {
+  --character-count: 9;
   display: grid;
-  grid-template-columns: repeat(9, minmax(52px, 1fr));
+  grid-template-columns: repeat(var(--character-count), minmax(58px, 1fr));
   gap: 6px;
   width: 100%;
   overflow-x: auto;
@@ -21,9 +22,9 @@
 
 .characterChip {
   min-width: 0;
-  min-height: 66px;
+  min-height: 76px;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto auto;
   justify-items: center;
   align-items: center;
   gap: 3px;
@@ -80,6 +81,35 @@
   line-height: 1.05;
   text-align: center;
   word-break: break-word;
+}
+
+.characterRole {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 2px 5px;
+  border-radius: 999px;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.58);
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.selectedCharacter .characterRole {
+  color: #14532d;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.characterRole.victimRole {
+  color: #fee2e2;
+  background: rgba(185, 28, 28, 0.82);
+}
+
+.selectedCharacter .characterRole.victimRole {
+  color: #7f1d1d;
+  background: rgba(254, 226, 226, 0.86);
 }
 
 .playActionRow {
@@ -206,18 +236,23 @@
   }
 
   .characterRow {
-    grid-template-columns: repeat(9, minmax(50px, 1fr));
+    grid-template-columns: repeat(var(--character-count), minmax(54px, 1fr));
     gap: 5px;
   }
 
   .characterChip {
-    min-height: 61px;
+    min-height: 70px;
     border-radius: 13px;
   }
 
   .characterPortrait {
     width: 33px;
     height: 33px;
+  }
+
+  .characterRole {
+    font-size: 7px;
+    padding: 2px 4px;
   }
 
   .playActionRow {
