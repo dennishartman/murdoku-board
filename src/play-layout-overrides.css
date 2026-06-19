@@ -166,6 +166,12 @@
   pointer-events: none;
 }
 
+.solutionMurdererCell::before {
+  border-color: rgba(220, 38, 38, 0.95);
+  background: rgba(254, 202, 202, 0.42);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.42), 0 0 22px rgba(220, 38, 38, 0.45);
+}
+
 .solutionMarker {
   position: absolute;
   inset: 12%;
@@ -181,6 +187,17 @@
   line-height: 1;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.34);
   pointer-events: none;
+}
+
+.solutionMurdererCell .solutionMarker {
+  color: #fff1f2;
+  background: #dc2626;
+  border-color: #fee2e2;
+}
+
+.murdererSolutionItem {
+  border-color: rgba(248, 113, 113, 0.58);
+  background: rgba(127, 29, 29, 0.5);
 }
 
 .hintPanel {
