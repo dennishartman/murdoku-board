@@ -1,4 +1,4 @@
-import { analyzeDeductiveState, isDeductivelySolved, scoreDeductiveProgress, type DeductiveState } from "./deductiveMurdokuSolver";
+import { analyzeDeductiveState, scoreDeductiveProgress, type DeductiveState } from "./deductiveMurdokuSolver";
 import type { HumanCandidateSolution } from "./humanSolver";
 import type { BoardGrid, BoardSolution, CharacterGender, Hint, HintSubject, HintTarget, PlayLetter, SolutionPosition } from "../types/board";
 
@@ -29,11 +29,11 @@ type HintOption = {
 };
 
 type HintValidationResult =
-  | { ok: true; remainingSolutions: number; goalState: DeductiveState }
+  | { ok: true; remainingSolutions: number; goalState: DeductiveState; murdererLetter: PlayLetter; victimPosition: SolutionPosition }
   | { ok: false; remainingSolutions: number; goalState: DeductiveState; message: string };
 
 type HintSelectionResult =
-  | { ok: true; hints: Hint[]; remainingSolutions: number; goalState: DeductiveState }
+  | { ok: true; hints: Hint[]; remainingSolutions: number; goalState: DeductiveState; murdererLetter: PlayLetter; victimPosition: SolutionPosition }
   | { ok: false; hints: Hint[]; remainingSolutions: number; goalState: DeductiveState; message: string };
 
 type GenerateHintsResult =
@@ -238,6 +238,14 @@ function hintCoversLetter(hint: Hint, letter: PlayLetter) {
   return explicitHintLetters(hint).includes(letter);
 }
 
+function getSuspectLetters(board: BoardGrid) {
+  return board.activeLetters.filter((letter) => letter !== "V");
+}
+
+function isAllowedSelectableHint(hint: Hint) {
+  return !hintCoversLetter(hint, "V") || hint.type === "murderer_room";
+}
+
 function isGeneralHint(hint: Hint) {
   return hint.type === "room_person_count" || (hint.type === "room_group_count" && !hint.subject);
 }
@@ -257,6 +265,44 @@ function isRowColumnHint(hint: Hint) {
 function isValidCandidateCell(board: BoardGrid, row: number, col: number) {
   const cell = getCell(board, row, col);
   return Boolean(cell?.isActive && !cell.isBlocked && !cell.isObject && cell.roomId);
+}
+
+function inferVictimPositionFromSuspects(board: BoardGrid, state: DeductiveState) {
+  const usedRows = new Set<number>();
+  const usedCols = new Set<number>();
+
+  for (const letter of getSuspectLetters(board)) {
+    const position = state.exactPositions[letter];
+
+    if (!position) {
+      return null;
+    }
+
+    usedRows.add(position.row);
+    usedCols.add(position.col);
+  }
+
+  const remainingRows = Array.from({ length: board.rows }, (_value, index) => index).filter((row) => !usedRows.has(row));
+  const remainingCols = Array.from({ length: board.cols }, (_value, index) => index).filter((col) => !usedCols.has(col));
+
+  if (remainingRows.length !== 1 || remainingCols.length !== 1) {
+    return null;
+  }
+
+  const row = remainingRows[0];
+  const col = remainingCols[0];
+
+  if (row === undefined || col === undefined) {
+    return null;
+  }
+
+  const cell = getCell(board, row, col);
+
+  if (!cell?.isActive || cell.isBlocked || cell.isObject || !cell.roomId) {
+    return null;
+  }
+
+  return { row, col } satisfies SolutionPosition;
 }
 
 function inferMurdererLetter(board: BoardGrid, solution: BoardSolution) {
@@ -910,7 +956,7 @@ function findBestHint(
   const hintOptions: HintOption[] = [];
 
   for (const hint of hintCandidates) {
-    if (usedHintIds.has(hint.id) || !predicate(hint)) {
+    if (usedHintIds.has(hint.id) || !isAllowedSelectableHint(hint) || !predicate(hint)) {
       continue;
     }
 
@@ -947,6 +993,15 @@ function validateHintSet(board: BoardGrid, hints: Hint[], baseCandidates: HumanC
   let before = analyzeDeductiveState(board, current);
 
   for (const hint of hints) {
+    if (hintCoversLetter(hint, "V") && hint.type !== "murderer_room") {
+      return {
+        ok: false,
+        remainingSolutions: current.length,
+        goalState: before,
+        message: `Hint ${hint.id} geeft directe informatie over V. Alleen de slachtofferhint is toegestaan.`
+      };
+    }
+
     const newCoverage = explicitHintLetters(hint).some((letter) => !coveredLetters.has(letter));
     const filtered = filterCandidateSolutions(board, current, hint);
 
@@ -991,36 +1046,84 @@ function validateHintSet(board: BoardGrid, hints: Hint[], baseCandidates: HumanC
     };
   }
 
-  if (!isDeductivelySolved(board, before)) {
+  const missingExactSuspects = getSuspectLetters(board).filter((letter) => !before.exactPositions[letter]);
+
+  if (missingExactSuspects.length > 0) {
     return {
       ok: false,
       remainingSolutions: current.length,
       goalState: before,
-      message: `De deductieve validator kan de moordenaar nog niet logisch bepalen. Kandidaten: ${before.murdererCandidates.join(", ") || "geen"}.`
+      message: `Niet alle verdachten kunnen exact geplaatst worden. Mist: ${missingExactSuspects.join(", ")}.`
     };
   }
 
-  const minimumExactCount = board.difficulty === "easy" ? 2 : 1;
+  const inferredVictimPosition = inferVictimPositionFromSuspects(board, before);
 
-  if (before.exactCount < minimumExactCount) {
+  if (!inferredVictimPosition) {
     return {
       ok: false,
       remainingSolutions: current.length,
       goalState: before,
-      message: `De validator vindt maar ${before.exactCount} exacte plaatsing(en). Minimaal nodig: ${minimumExactCount}.`
+      message: "V kan niet als laatste open plek worden afgeleid uit de verdachte posities."
+    };
+  }
+
+  const victimRoomId = getCellRoomId(board, inferredVictimPosition);
+
+  if (!victimRoomId) {
+    return {
+      ok: false,
+      remainingSolutions: current.length,
+      goalState: before,
+      message: "De afgeleide V-positie heeft geen kamer."
+    };
+  }
+
+  const suspectsInVictimRoom = getSuspectLetters(board).filter((letter) => getCellRoomId(board, before.exactPositions[letter]) === victimRoomId);
+
+  if (suspectsInVictimRoom.length !== 1) {
+    return {
+      ok: false,
+      remainingSolutions: current.length,
+      goalState: before,
+      message: `Er blijft niet precies 1 verdachte in de kamer van V over. Kandidaten: ${suspectsInVictimRoom.join(", ") || "geen"}.`
+    };
+  }
+
+  const murdererLetter = suspectsInVictimRoom[0];
+
+  if (!murdererLetter) {
+    return {
+      ok: false,
+      remainingSolutions: current.length,
+      goalState: before,
+      message: "Er is geen moordenaar afgeleid."
+    };
+  }
+
+  const possibleMurderers = new Set(current.map((candidate) => candidate.murdererLetter));
+
+  if (possibleMurderers.size !== 1 || !possibleMurderers.has(murdererLetter)) {
+    return {
+      ok: false,
+      remainingSolutions: current.length,
+      goalState: before,
+      message: "De volledige oplossingen zijn het nog niet eens over dezelfde moordenaar."
     };
   }
 
   return {
     ok: true,
     remainingSolutions: current.length,
-    goalState: before
+    goalState: before,
+    murdererLetter,
+    victimPosition: inferredVictimPosition
   };
 }
 
 function directPlacementHintsForLetter(letter: PlayLetter, hintCandidates: Hint[], usedHintIds: Set<string>) {
   return hintCandidates
-    .filter((hint) => hintCoversLetter(hint, letter) && isRowColumnHint(hint) && !usedHintIds.has(hint.id))
+    .filter((hint) => letter !== "V" && hintCoversLetter(hint, letter) && isRowColumnHint(hint) && !usedHintIds.has(hint.id) && isAllowedSelectableHint(hint))
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 
@@ -1061,11 +1164,7 @@ function selectBetaHints(board: BoardGrid, hintCandidates: Hint[], baseCandidate
     addHint(victimMurdererHint, filterCandidateSolutions(board, currentCandidates, victimMurdererHint));
   }
 
-  for (const letter of board.activeLetters) {
-    if (letter === "V") {
-      continue;
-    }
-
+  for (const letter of getSuspectLetters(board)) {
     const addedNonDirect = tryAdd(
       (hint) => hintCoversLetter(hint, letter) && !isNegativeRoomHint(hint) && !isRowColumnHint(hint),
       { preferLetter: letter }
@@ -1081,7 +1180,7 @@ function selectBetaHints(board: BoardGrid, hintCandidates: Hint[], baseCandidate
     );
 
     if (!addedDirect) {
-      const fallback = hintCandidates.find((hint) => hintCoversLetter(hint, letter) && !usedHintIds.has(hint.id));
+      const fallback = hintCandidates.find((hint) => hintCoversLetter(hint, letter) && !usedHintIds.has(hint.id) && isAllowedSelectableHint(hint));
 
       if (fallback) {
         addHint(fallback, filterCandidateSolutions(board, currentCandidates, fallback));
@@ -1090,7 +1189,6 @@ function selectBetaHints(board: BoardGrid, hintCandidates: Hint[], baseCandidate
   }
 
   if (victimRoomId) {
-    tryAdd((hint) => isPositiveRoomHint(hint) && hintCoversLetter(hint, "V") && hint.roomId === victimRoomId, { preferLetter: "V" });
     tryAdd((hint) => hint.type === "room_person_count" && hint.roomId === victimRoomId);
   }
 
@@ -1102,11 +1200,11 @@ function selectBetaHints(board: BoardGrid, hintCandidates: Hint[], baseCandidate
 
   while (!validation.ok && selected.length < maxHintCount) {
     const state = analyzeDeductiveState(board, currentCandidates);
-    const missingLetters = board.activeLetters.filter((letter) => !selected.some((hint) => hintCoversLetter(hint, letter)));
-    const targetLetter = missingLetters.find((letter) => letter !== "V")
-      ?? (state.solvedMurderer && !state.solvedMurdererPosition ? state.solvedMurderer : null)
+    const missingLetters = getSuspectLetters(board).filter((letter) => !selected.some((hint) => hintCoversLetter(hint, letter)));
+    const unplacedSuspects = getSuspectLetters(board).filter((letter) => !state.exactPositions[letter]);
+    const targetLetter = missingLetters[0]
       ?? (trueMurderer && !state.exactPositions[trueMurderer] ? trueMurderer : null)
-      ?? state.murdererCandidates.find((letter) => !state.knownRooms[letter])
+      ?? unplacedSuspects[0]
       ?? null;
 
     if (targetLetter) {
@@ -1130,7 +1228,7 @@ function selectBetaHints(board: BoardGrid, hintCandidates: Hint[], baseCandidate
 
     const directTarget = targetLetter ?? trueMurderer;
 
-    if (!directTarget) {
+    if (!directTarget || directTarget === "V") {
       break;
     }
 
@@ -1176,7 +1274,9 @@ function selectBetaHints(board: BoardGrid, hintCandidates: Hint[], baseCandidate
     ok: true,
     hints: selected,
     remainingSolutions: validation.remainingSolutions,
-    goalState: validation.goalState
+    goalState: validation.goalState,
+    murdererLetter: validation.murdererLetter,
+    victimPosition: validation.victimPosition
   };
 }
 
@@ -1242,8 +1342,9 @@ export function generateBetaHints(board: BoardGrid): GenerateHintsResult {
     };
   }
 
-  const solvedMurderer = selection.goalState.solvedMurderer ?? "?";
   const cappedText = candidateResult.capped ? " binnen de beta-limiet" : "";
+  const victimRow = selection.victimPosition.row + 1;
+  const victimCol = selection.victimPosition.col + 1;
   const remainingText = selection.remainingSolutions === 1
     ? "1 volledige oplossing"
     : `${selection.remainingSolutions} volledige oplossingen, maar 1 moordenaar`;
@@ -1252,6 +1353,6 @@ export function generateBetaHints(board: BoardGrid): GenerateHintsResult {
     ok: true,
     hints: selection.hints,
     candidateCount: candidateResult.candidates.length,
-    message: `${selection.hints.length} gevalideerde deductieve hints gegenereerd. Elk personage heeft minimaal 1 hint. De solver vindt ${solvedMurderer} als moordenaar met exacte plaats. ${candidateResult.candidates.length} naar ${remainingText}${cappedText}.`
+    message: `${selection.hints.length} gevalideerde deductieve hints gegenereerd. Alle verdachten worden geplaatst, V blijft over op rij ${victimRow}, kolom ${victimCol}. Moordenaar: ${selection.murdererLetter}. ${candidateResult.candidates.length} naar ${remainingText}${cappedText}.`
   };
 }
