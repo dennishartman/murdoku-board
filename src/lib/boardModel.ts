@@ -158,6 +158,7 @@ function calculateActiveLetters(rows: number, cols: number, cells: BoardCell[], 
 function clearSolution(board: BoardGrid) {
   board.solution = null;
   board.murdererLetter = null;
+  board.hints = [];
   return board;
 }
 
@@ -539,12 +540,14 @@ export function setEdgeBoundary(input: BoardGrid, row: number, col: number, side
 export function setRoomDetails(input: BoardGrid, roomId: string, color: string, name: string) {
   const board = cloneBoard(input);
   board.rooms = board.rooms.map((room) => (room.id === roomId ? { ...room, color, name } : room));
+  board.hints = [];
   return board;
 }
 
 export function setRoomColor(input: BoardGrid, roomId: string, color: string) {
   const board = cloneBoard(input);
   board.rooms = board.rooms.map((room) => (room.id === roomId ? { ...room, color } : room));
+  board.hints = [];
   return board;
 }
 
