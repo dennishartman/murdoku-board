@@ -8,9 +8,19 @@ import { describeHints } from "./lib/hintEngine";
 import { generateBetaHints } from "./lib/hintGenerator";
 import { describeSolution, generateSolution } from "./lib/solutionGenerator";
 import { loadBoard, saveBoard } from "./lib/storage";
-import type { BoardGrid, BuilderToolMode, PlayToolMode, PuzzleDifficulty } from "./types/board";
+import type { BoardGrid, BuilderToolMode, Hint, HintSubject, PlayLetter, PlayToolMode, PuzzleDifficulty } from "./types/board";
 
 type ScreenMode = "setup" | "edit" | "play";
+
+type HintTextGroup = {
+  key: string;
+  title: string;
+  items: Array<{
+    hint: Hint;
+    text: string;
+    index: number;
+  }>;
+};
 
 function difficultyLabel(difficulty: PuzzleDifficulty) {
   if (difficulty === "easy") {
@@ -22,6 +32,82 @@ function difficultyLabel(difficulty: PuzzleDifficulty) {
   }
 
   return "Normaal";
+}
+
+function subjectGroupKey(subject: HintSubject) {
+  if (subject.kind === "character") {
+    return `character:${subject.letter}`;
+  }
+
+  return `gender:${subject.gender}`;
+}
+
+function hintGroupKey(hint: Hint) {
+  if (hint.type === "murderer_room") {
+    return `character:${hint.victimLetter}`;
+  }
+
+  if (hint.type === "room_person_count") {
+    return "general";
+  }
+
+  if (hint.type === "room_group_count") {
+    return hint.subject ? subjectGroupKey(hint.subject) : "general";
+  }
+
+  return subjectGroupKey(hint.subject);
+}
+
+function hintGroupTitle(board: BoardGrid, key: string) {
+  if (key.startsWith("character:")) {
+    const letter = key.replace("character:", "") as PlayLetter;
+    const character = board.activeCharacters[letter];
+
+    return character ? `${character.name} (${letter})` : `Personage ${letter}`;
+  }
+
+  if (key === "gender:male") {
+    return "Mannen";
+  }
+
+  if (key === "gender:female") {
+    return "Vrouwen";
+  }
+
+  if (key === "gender:neutral") {
+    return "Personen";
+  }
+
+  return "Algemene hints";
+}
+
+function makeHintGroups(board: BoardGrid, hintTexts: string[]) {
+  const groups: HintTextGroup[] = [];
+  const groupIndexes = new Map<string, number>();
+
+  board.hints.forEach((hint, index) => {
+    const key = hintGroupKey(hint);
+    const item = {
+      hint,
+      text: hintTexts[index] ?? "Onbekende hint.",
+      index
+    };
+    const groupIndex = groupIndexes.get(key);
+
+    if (groupIndex === undefined) {
+      groupIndexes.set(key, groups.length);
+      groups.push({
+        key,
+        title: hintGroupTitle(board, key),
+        items: [item]
+      });
+      return;
+    }
+
+    groups[groupIndex].items.push(item);
+  });
+
+  return groups;
 }
 
 export function App() {
@@ -187,6 +273,7 @@ export function App() {
   const murdererRow = solutionRows.find((entry) => entry.isMurderer);
   const hintCount = board?.hints.length ?? 0;
   const hintTexts = useMemo(() => (board ? describeHints(board.hints, board, board.activeCharacters) : []), [board]);
+  const hintGroups = useMemo(() => (board ? makeHintGroups(board, hintTexts) : []), [board, hintTexts]);
   const selectedHint = board?.hints.find((hint) => hint.id === selectedHintId) ?? null;
 
   return (
@@ -261,22 +348,29 @@ export function App() {
                 <span>3</span>
                 <div>
                   <h2>Hints controleren</h2>
-                  <p>Klik op een hint om de relevante cellen op het bord te markeren. Dit is alleen een hulpmiddel in de bewerkmodus.</p>
+                  <p>Klik op een hintzin om de relevante cellen op het bord te markeren. De hints zijn gegroepeerd per personage.</p>
                 </div>
                 <button className="ghostButton smallButton" type="button" onClick={() => setSelectedHintId(null)} disabled={!selectedHintId}>Wis selectie</button>
               </div>
 
-              <div className="hintDebugList" aria-label="Gegenereerde hints">
-                {board.hints.map((hint, index) => (
-                  <button
-                    key={hint.id}
-                    className={selectedHintId === hint.id ? "hintDebugItem activeHintDebugItem" : "hintDebugItem"}
-                    type="button"
-                    onClick={() => setSelectedHintId((current) => (current === hint.id ? null : hint.id))}
-                  >
-                    <strong>{index + 1}</strong>
-                    <span>{hintTexts[index] ?? "Onbekende hint."}</span>
-                  </button>
+              <div className="hintDebugText" aria-label="Gegenereerde hints">
+                {hintGroups.map((group) => (
+                  <article className="hintTextGroup" key={group.key}>
+                    <h3>{group.title}</h3>
+                    <p>
+                      {group.items.map((item) => (
+                        <button
+                          key={item.hint.id}
+                          className={selectedHintId === item.hint.id ? "hintInlineItem activeHintInlineItem" : "hintInlineItem"}
+                          type="button"
+                          onClick={() => setSelectedHintId((current) => (current === item.hint.id ? null : item.hint.id))}
+                        >
+                          <strong>{item.index + 1}.</strong>
+                          <span>{item.text}</span>
+                        </button>
+                      ))}
+                    </p>
+                  </article>
                 ))}
               </div>
             </section>
