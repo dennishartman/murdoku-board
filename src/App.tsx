@@ -17,7 +17,7 @@ export function App() {
   const [mode, setMode] = useState<ScreenMode>("setup");
   const [activeBuilderTool, setActiveBuilderTool] = useState<BuilderToolMode>("shape");
   const [activePlayTool, setActivePlayTool] = useState<PlayToolMode>("letter");
-  const [selectedLetter, setSelectedLetter] = useState(PLAY_LETTERS[0]);
+  const [selectedLetter, setSelectedLetter] = useState<string>(PLAY_LETTERS[0]);
   const [status, setStatus] = useState("Kies rijen en kolommen en maak daarna een leeg basisgrid.");
 
   function handleCreateBoard() {
