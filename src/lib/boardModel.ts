@@ -1,5 +1,5 @@
 import { DEFAULT_THEME_ID, createActiveCharacterSet, ensureActiveCharacterSet, makeActiveLettersForCharacterCount } from "./characterPool";
-import type { BoardCell, BoardGrid, BoardRoom, BuilderToolMode, EdgeSide, PlayLetter } from "../types/board";
+import type { BoardCell, BoardGrid, BoardRoom, BuilderToolMode, EdgeSide, PlayLetter, PuzzleDifficulty } from "../types/board";
 
 export const DEFAULT_ROOM_COLOR = "#e5e7eb";
 
@@ -14,6 +14,8 @@ export const ROOM_COLORS = [
 ];
 
 export const PLAY_LETTERS: PlayLetter[] = ["A", "B", "C", "D", "E", "F", "G", "H", "V"];
+
+export const DEFAULT_DIFFICULTY: PuzzleDifficulty = "normal";
 
 const LETTER_SLOT_ORDER = [0, 2, 6, 8, 1, 5, 7, 3, 4];
 
@@ -70,41 +72,53 @@ function makeHorizontalWalls(rows: number, cols: number) {
   return Array.from({ length: rows + 1 }, (_, row) => Array.from({ length: cols }, () => row === 0 || row === rows));
 }
 
-function calculateActiveLetters(rows: number, cols: number, cells: BoardCell[]) {
+function getSafeDifficulty(difficulty?: PuzzleDifficulty | null): PuzzleDifficulty {
+  if (difficulty === "easy" || difficulty === "hard" || difficulty === "normal") {
+    return difficulty;
+  }
+
+  return DEFAULT_DIFFICULTY;
+}
+
+function calculateMaxCharacters(rows: number, cols: number, cells: BoardCell[]) {
   const activeRows = new Set<number>();
   const activeCols = new Set<number>();
+  let availableCells = 0;
 
   for (const cell of cells) {
-    if (!cell.isActive) {
+    if (!cell.isActive || cell.isBlocked || cell.isObject) {
       continue;
     }
 
+    availableCells += 1;
     activeRows.add(cell.row);
     activeCols.add(cell.col);
   }
 
   const rowCount = activeRows.size || rows;
   const colCount = activeCols.size || cols;
-  const maxCharacters = Math.max(1, Math.min(rowCount, colCount, PLAY_LETTERS.length));
-
-  return makeActiveLettersForCharacterCount(maxCharacters);
+  return Math.max(1, Math.min(rowCount, colCount, availableCells || rows * cols, PLAY_LETTERS.length));
 }
 
-function normalizeActiveLetters(rows: number, cols: number, cells: BoardCell[], current?: PlayLetter[] | null) {
-  const calculated = calculateActiveLetters(rows, cols, cells);
-  const calculatedSet = new Set(calculated);
+export function getCharacterCountForDifficulty(difficulty: PuzzleDifficulty, maxCharacters: number) {
+  const max = Math.max(1, Math.min(PLAY_LETTERS.length, Math.floor(maxCharacters)));
+  const minimum = Math.min(max, max >= 3 ? 3 : max);
 
-  if (!Array.isArray(current) || current.length === 0) {
-    return calculated;
+  if (difficulty === "hard") {
+    return max;
   }
 
-  const filtered = current.filter((letter): letter is PlayLetter => PLAY_LETTERS.includes(letter as PlayLetter) && calculatedSet.has(letter as PlayLetter));
-
-  if (!filtered.includes("V")) {
-    filtered.push("V");
+  if (difficulty === "easy") {
+    return Math.min(max, Math.max(minimum, Math.ceil(max * 0.65)));
   }
 
-  return filtered.length > 0 ? filtered : calculated;
+  return Math.min(max, Math.max(minimum, Math.ceil(max * 0.85)));
+}
+
+function calculateActiveLetters(rows: number, cols: number, cells: BoardCell[], difficulty: PuzzleDifficulty) {
+  const maxCharacters = calculateMaxCharacters(rows, cols, cells);
+  const characterCount = getCharacterCountForDifficulty(difficulty, maxCharacters);
+  return makeActiveLettersForCharacterCount(characterCount);
 }
 
 function sanitizePlayLetters(board: BoardGrid) {
@@ -131,6 +145,7 @@ export function getCell(board: BoardGrid, row: number, col: number) {
 
 export function normalizeBoard(board: BoardGrid): BoardGrid {
   const selectedThemeId = board.selectedThemeId ?? DEFAULT_THEME_ID;
+  const difficulty = getSafeDifficulty(board.difficulty);
   const normalizedCells = board.cells.map((cell) => {
     const autoCrossSources = Array.isArray(cell.autoCrossSources) ? uniqueSources(cell.autoCrossSources) : [];
     const manualCross = typeof cell.manualCross === "boolean" ? cell.manualCross : cell.isCrossed ?? false;
@@ -148,11 +163,14 @@ export function normalizeBoard(board: BoardGrid): BoardGrid {
       roomId: cell.roomId ?? null
     };
   });
+  const maxCharacters = calculateMaxCharacters(board.rows, board.cols, normalizedCells);
 
   const normalizedBoard: BoardGrid = {
     ...board,
     selectedThemeId,
-    activeLetters: normalizeActiveLetters(board.rows, board.cols, normalizedCells, board.activeLetters),
+    difficulty,
+    maxCharacters,
+    activeLetters: calculateActiveLetters(board.rows, board.cols, normalizedCells, difficulty),
     activeCharacters: ensureActiveCharacterSet(selectedThemeId, board.activeCharacters),
     hints: Array.isArray(board.hints) ? [...board.hints] : [],
     cells: normalizedCells,
@@ -206,10 +224,12 @@ function recalculateAutoCrosses(board: BoardGrid) {
   return board;
 }
 
-export function createBoard(rows: number, cols: number, referenceImageUrl: string | null): BoardGrid {
+export function createBoard(rows: number, cols: number, referenceImageUrl: string | null, difficulty: PuzzleDifficulty = DEFAULT_DIFFICULTY): BoardGrid {
   const selectedThemeId = DEFAULT_THEME_ID;
+  const safeDifficulty = getSafeDifficulty(difficulty);
   const cells = makeCells(rows, cols);
-  const activeLetters = calculateActiveLetters(rows, cols, cells);
+  const maxCharacters = calculateMaxCharacters(rows, cols, cells);
+  const activeLetters = calculateActiveLetters(rows, cols, cells, safeDifficulty);
   const board: BoardGrid = {
     rows,
     cols,
@@ -219,6 +239,8 @@ export function createBoard(rows: number, cols: number, referenceImageUrl: strin
     horizontalWalls: makeHorizontalWalls(rows, cols),
     referenceImageUrl,
     selectedThemeId,
+    difficulty: safeDifficulty,
+    maxCharacters,
     activeLetters,
     activeCharacters: createActiveCharacterSet(selectedThemeId),
     hints: []
@@ -363,7 +385,8 @@ export function recalculateRooms(input: BoardGrid): BoardGrid {
   }
 
   board.rooms = rooms;
-  board.activeLetters = calculateActiveLetters(board.rows, board.cols, board.cells);
+  board.maxCharacters = calculateMaxCharacters(board.rows, board.cols, board.cells);
+  board.activeLetters = calculateActiveLetters(board.rows, board.cols, board.cells, board.difficulty);
   return recalculateAutoCrosses(board);
 }
 
@@ -430,7 +453,7 @@ export function applyBuilderTool(input: BoardGrid, row: number, col: number, too
     if (cell.isObject) {
       cell.isBlocked = false;
     }
-    return board;
+    return recalculateRooms(board);
   }
 
   if (tool === "blocked") {
@@ -443,6 +466,8 @@ export function applyBuilderTool(input: BoardGrid, row: number, col: number, too
     cell.autoCrossSources = [];
     cell.finalLetter = null;
     cell.playMarks = makeEmptyMarks();
+    board.maxCharacters = calculateMaxCharacters(board.rows, board.cols, board.cells);
+    board.activeLetters = calculateActiveLetters(board.rows, board.cols, board.cells, board.difficulty);
     return recalculateAutoCrosses(board);
   }
 
