@@ -1,4 +1,5 @@
-import type { BoardCell, BoardGrid, BoardRoom, BuilderToolMode, EdgeSide } from "../types/board";
+import { DEFAULT_THEME_ID, createActiveCharacterSet, ensureActiveCharacterSet } from "./characterPool";
+import type { BoardCell, BoardGrid, BoardRoom, BuilderToolMode, EdgeSide, PlayLetter } from "../types/board";
 
 export const DEFAULT_ROOM_COLOR = "#e5e7eb";
 
@@ -12,7 +13,7 @@ export const ROOM_COLORS = [
   "#a855f7"
 ];
 
-export const PLAY_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "V"];
+export const PLAY_LETTERS: PlayLetter[] = ["A", "B", "C", "D", "E", "F", "G", "H", "V"];
 
 const LETTER_SLOT_ORDER = [0, 2, 6, 8, 1, 5, 7, 3, 4];
 
@@ -74,8 +75,13 @@ export function getCell(board: BoardGrid, row: number, col: number) {
 }
 
 export function normalizeBoard(board: BoardGrid): BoardGrid {
+  const selectedThemeId = board.selectedThemeId ?? DEFAULT_THEME_ID;
+
   return {
     ...board,
+    selectedThemeId,
+    activeCharacters: ensureActiveCharacterSet(selectedThemeId, board.activeCharacters),
+    hints: Array.isArray(board.hints) ? [...board.hints] : [],
     cells: board.cells.map((cell) => {
       const autoCrossSources = Array.isArray(cell.autoCrossSources) ? uniqueSources(cell.autoCrossSources) : [];
       const manualCross = typeof cell.manualCross === "boolean" ? cell.manualCross : cell.isCrossed ?? false;
@@ -93,7 +99,7 @@ export function normalizeBoard(board: BoardGrid): BoardGrid {
         roomId: cell.roomId ?? null
       };
     }),
-    rooms: board.rooms.map((room) => ({ ...room, cells: room.cells.map(([row, col]) => [row, col] as [number, number]) })),
+    rooms: (board.rooms ?? []).map((room) => ({ ...room, cells: room.cells.map(([row, col]) => [row, col] as [number, number]) })),
     verticalWalls: board.verticalWalls.map((line) => [...line]),
     horizontalWalls: board.horizontalWalls.map((line) => [...line])
   };
@@ -140,6 +146,7 @@ function recalculateAutoCrosses(board: BoardGrid) {
 }
 
 export function createBoard(rows: number, cols: number, referenceImageUrl: string | null): BoardGrid {
+  const selectedThemeId = DEFAULT_THEME_ID;
   const board: BoardGrid = {
     rows,
     cols,
@@ -147,7 +154,10 @@ export function createBoard(rows: number, cols: number, referenceImageUrl: strin
     rooms: [],
     verticalWalls: makeVerticalWalls(rows, cols),
     horizontalWalls: makeHorizontalWalls(rows, cols),
-    referenceImageUrl
+    referenceImageUrl,
+    selectedThemeId,
+    activeCharacters: createActiveCharacterSet(selectedThemeId),
+    hints: []
   };
 
   return recalculateRooms(board);
