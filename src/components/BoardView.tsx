@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from "react";
 import { applyBuilderTool, DEFAULT_ROOM_COLOR, getCell, hasBoundary, setEdgeBoundary } from "../lib/boardModel";
 import { DETECTIVE_OBSTACLES, DETECTIVE_OBJECTS, DETECTIVE_ROOMS, getObjectDefinition, getObstacleDefinition } from "../lib/themeContent";
-import type { BoardGrid, BoardObjectTypeId, BoardObstacleTypeId, BuilderToolMode, EdgeSide, PlayLetter } from "../types/board";
+import type { BoardCell, BoardGrid, BoardObjectTypeId, BoardObstacleTypeId, BuilderToolMode, EdgeSide, Hint, HintTarget, PlayLetter, SolutionPosition } from "../types/board";
 
 type BoardEditorViewProps = {
   board: BoardGrid;
   activeTool: BuilderToolMode;
   showSolution?: boolean;
+  selectedHint?: Hint | null;
   onBoardChange: (board: BoardGrid) => void;
 };
 
 type WallOrientation = "horizontal" | "vertical";
+type RelationDirection = "above" | "below" | "left_of" | "right_of";
 
 type WallDragState = {
   active: boolean;
@@ -130,6 +132,18 @@ function getSolutionLetter(board: BoardGrid, row: number, col: number): PlayLett
   return null;
 }
 
+function getSolutionPosition(board: BoardGrid, letter: PlayLetter | undefined) {
+  if (!letter || !board.solution) {
+    return null;
+  }
+
+  return board.solution[letter] ?? null;
+}
+
+function isSamePosition(a: SolutionPosition | null | undefined, b: SolutionPosition) {
+  return Boolean(a && a.row === b.row && a.col === b.col);
+}
+
 function isRoomLabelAnchor(board: BoardGrid, roomId: string | null, row: number, col: number) {
   if (!roomId) {
     return false;
@@ -141,7 +155,199 @@ function isRoomLabelAnchor(board: BoardGrid, roomId: string | null, row: number,
   return Boolean(firstCell && firstCell[0] === row && firstCell[1] === col);
 }
 
-export function BoardEditorView({ board, activeTool, showSolution = false, onBoardChange }: BoardEditorViewProps) {
+function isPersonCandidateCell(cell: BoardCell) {
+  return cell.isActive && !cell.isBlocked && !cell.isObject;
+}
+
+function targetMatchesCell(target: HintTarget, cell: BoardCell) {
+  if (target.kind === "object") {
+    return cell.isObject && Boolean(cell.objectType) && (!target.objectType || cell.objectType === target.objectType) && (!target.roomId || cell.roomId === target.roomId);
+  }
+
+  if (target.kind === "obstacle") {
+    return cell.isBlocked && Boolean(cell.obstacleType) && (!target.obstacleType || cell.obstacleType === target.obstacleType) && (!target.roomId || cell.roomId === target.roomId);
+  }
+
+  return false;
+}
+
+function getTargetPositions(board: BoardGrid, target: HintTarget) {
+  if (target.kind === "character") {
+    const position = getSolutionPosition(board, target.letter);
+    return position ? [position] : [];
+  }
+
+  if (target.kind === "gender") {
+    return board.activeLetters
+      .filter((letter) => board.activeCharacters[letter]?.gender === target.gender)
+      .map((letter) => getSolutionPosition(board, letter))
+      .filter((position): position is SolutionPosition => Boolean(position));
+  }
+
+  return board.cells.filter((cell) => targetMatchesCell(target, cell)).map((cell) => ({ row: cell.row, col: cell.col }));
+}
+
+function getHintTarget(hint: Hint): HintTarget | null {
+  if (hint.type === "adjacent" || hint.type === "diagonal" || hint.type === "distance" || hint.type === "direction") {
+    return hint.target;
+  }
+
+  return null;
+}
+
+function getHintSubjectPosition(board: BoardGrid, hint: Hint) {
+  if ("subject" in hint && hint.subject.kind === "character") {
+    return getSolutionPosition(board, hint.subject.letter);
+  }
+
+  return null;
+}
+
+function relationMatchesPosition(type: "adjacent" | "diagonal" | "direction", position: SolutionPosition, target: SolutionPosition, direction?: RelationDirection) {
+  if (type === "adjacent") {
+    return Math.abs(position.row - target.row) + Math.abs(position.col - target.col) === 1;
+  }
+
+  if (type === "diagonal") {
+    return Math.abs(position.row - target.row) === 1 && Math.abs(position.col - target.col) === 1;
+  }
+
+  if (direction === "left_of") {
+    return position.row === target.row && position.col < target.col;
+  }
+
+  if (direction === "right_of") {
+    return position.row === target.row && position.col > target.col;
+  }
+
+  if (direction === "above") {
+    return position.col === target.col && position.row < target.row;
+  }
+
+  if (direction === "below") {
+    return position.col === target.col && position.row > target.row;
+  }
+
+  return false;
+}
+
+function distanceMatchesPosition(position: SolutionPosition, target: SolutionPosition, axis: "row" | "col" | "either", distance: number, relation: "exactly" | "not_exactly" | "at_least" | "at_most") {
+  const value = axis === "row" ? Math.abs(position.row - target.row) : axis === "col" ? Math.abs(position.col - target.col) : Math.abs(position.row - target.row) + Math.abs(position.col - target.col);
+
+  if (relation === "exactly") {
+    return value === distance;
+  }
+
+  if (relation === "not_exactly") {
+    return value !== distance;
+  }
+
+  if (relation === "at_least") {
+    return value >= distance;
+  }
+
+  return value <= distance;
+}
+
+function edgeMatchesPosition(board: BoardGrid, position: SolutionPosition, edgeType: "any_edge" | "top" | "right" | "bottom" | "left" | "corner") {
+  const isTop = position.row === 0;
+  const isBottom = position.row === board.rows - 1;
+  const isLeft = position.col === 0;
+  const isRight = position.col === board.cols - 1;
+
+  if (edgeType === "top") {
+    return isTop;
+  }
+
+  if (edgeType === "right") {
+    return isRight;
+  }
+
+  if (edgeType === "bottom") {
+    return isBottom;
+  }
+
+  if (edgeType === "left") {
+    return isLeft;
+  }
+
+  if (edgeType === "corner") {
+    return (isTop || isBottom) && (isLeft || isRight);
+  }
+
+  return isTop || isRight || isBottom || isLeft;
+}
+
+function getHintCellClasses(board: BoardGrid, hint: Hint | null | undefined, cell: BoardCell) {
+  if (!hint || !cell.isActive) {
+    return [] as string[];
+  }
+
+  const classes: string[] = [];
+  const position = { row: cell.row, col: cell.col };
+  const target = getHintTarget(hint);
+  const targetPositions = target ? getTargetPositions(board, target) : [];
+  const subjectPosition = getHintSubjectPosition(board, hint);
+
+  if (targetPositions.some((targetPosition) => isSamePosition(targetPosition, position))) {
+    classes.push("hintTargetCell");
+  }
+
+  if (isSamePosition(subjectPosition, position)) {
+    classes.push("hintSubjectCell");
+  }
+
+  if (hint.type === "murderer_room") {
+    const victimPosition = getSolutionPosition(board, hint.victimLetter);
+    const roomId = hint.roomId ?? (victimPosition ? getCell(board, victimPosition.row, victimPosition.col)?.roomId : null);
+
+    if (roomId && cell.roomId === roomId) {
+      classes.push("hintRoomCell");
+    }
+  }
+
+  if (hint.type === "room_person_count" || hint.type === "room_group_count") {
+    if (cell.roomId === hint.roomId) {
+      classes.push("hintRoomCell");
+    }
+  }
+
+  if (hint.type === "room" && cell.roomId === hint.roomId) {
+    classes.push(hint.relation === "is_in" ? "hintRoomCell" : "hintLineCell");
+  }
+
+  if (hint.type === "row_column") {
+    const match = hint.axis === "row" ? cell.row + 1 === hint.index : cell.col + 1 === hint.index;
+
+    if (match) {
+      classes.push(hint.relation === "is" ? "hintLineCell" : "hintExcludedCell");
+    }
+  }
+
+  if (hint.type === "edge" && edgeMatchesPosition(board, position, hint.edgeType)) {
+    classes.push(hint.relation === "is" ? "hintLineCell" : "hintExcludedCell");
+  }
+
+  if ((hint.type === "adjacent" || hint.type === "diagonal" || hint.type === "direction") && isPersonCandidateCell(cell)) {
+    const match = targetPositions.some((targetPosition) => relationMatchesPosition(hint.type, position, targetPosition, hint.type === "direction" ? hint.direction : undefined));
+
+    if (match) {
+      classes.push(hint.relation === "is" ? "hintCandidateCell" : "hintExcludedCell");
+    }
+  }
+
+  if (hint.type === "distance" && isPersonCandidateCell(cell)) {
+    const match = targetPositions.some((targetPosition) => distanceMatchesPosition(position, targetPosition, hint.axis, hint.distance, hint.relation));
+
+    if (match) {
+      classes.push(hint.relation === "not_exactly" ? "hintExcludedCell" : "hintCandidateCell");
+    }
+  }
+
+  return Array.from(new Set(classes));
+}
+
+export function BoardEditorView({ board, activeTool, showSolution = false, selectedHint = null, onBoardChange }: BoardEditorViewProps) {
   const [selectedRoomId, setSelectedRoomId] = useState(DETECTIVE_ROOMS[0]?.id ?? "living_room");
   const [selectedObjectType, setSelectedObjectType] = useState<BoardObjectTypeId>(DETECTIVE_OBJECTS[0]?.id ?? "chair");
   const [selectedObstacleType, setSelectedObstacleType] = useState<BoardObstacleTypeId>(DETECTIVE_OBSTACLES[0]?.id ?? "table");
@@ -346,6 +552,12 @@ export function BoardEditorView({ board, activeTool, showSolution = false, onBoa
         </div>
       )}
 
+      {selectedHint && (
+        <div className="tipBox hintOverlayTip">
+          Geselecteerde hint wordt gemarkeerd. Goud = relevante rij, kolom of kamer. Blauw = mogelijke cellen bij de hint. Paars = doelobject of doelpersoon.
+        </div>
+      )}
+
       <div
         className="manualBoard editorBoard"
         style={{
@@ -365,6 +577,7 @@ export function BoardEditorView({ board, activeTool, showSolution = false, onBoa
           const solutionLetter = showSolution && cell.isActive ? getSolutionLetter(board, cell.row, cell.col) : null;
           const isMurderer = Boolean(solutionLetter && board.murdererLetter === solutionLetter);
           const showRoomName = cell.isActive && isRoomLabelAnchor(board, cell.roomId, cell.row, cell.col);
+          const hintClasses = getHintCellClasses(board, selectedHint, cell);
           const cellStyle: CSSProperties = cell.isActive
             ? {
                 backgroundColor: isBlocked ? "#9ca3af" : roomColor(board, cell.roomId),
@@ -385,7 +598,8 @@ export function BoardEditorView({ board, activeTool, showSolution = false, onBoa
             isBlocked ? "blockedCell" : "",
             isObject ? "objectCell" : "",
             solutionLetter ? "solutionCell" : "",
-            isMurderer ? "solutionMurdererCell" : ""
+            isMurderer ? "solutionMurdererCell" : "",
+            ...hintClasses
           ].filter(Boolean).join(" ");
 
           return (
