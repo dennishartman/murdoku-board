@@ -69,6 +69,7 @@ export type MurdererRoomHint = {
   id: string;
   type: "murderer_room";
   victimLetter: PlayLetter;
+  roomId?: string | null;
 };
 
 export type RoomPersonCountHint = {
@@ -85,6 +86,7 @@ export type RowColumnHint = {
   axis: "row" | "col";
   index: number;
   relation: "is" | "is_not";
+  roomId?: string | null;
 };
 
 export type RoomHint = {
@@ -101,6 +103,7 @@ export type AdjacentHint = {
   subject: HintSubject;
   target: HintTarget;
   relation: "is" | "is_not";
+  roomId?: string | null;
 };
 
 export type DiagonalHint = {
@@ -109,6 +112,7 @@ export type DiagonalHint = {
   subject: HintSubject;
   target: HintTarget;
   relation: "is" | "is_not";
+  roomId?: string | null;
 };
 
 export type EdgeHint = {
@@ -117,6 +121,7 @@ export type EdgeHint = {
   subject: HintSubject;
   edgeType: "any_edge" | "top" | "right" | "bottom" | "left" | "corner";
   relation: "is" | "is_not";
+  roomId?: string | null;
 };
 
 export type DistanceHint = {
@@ -127,6 +132,7 @@ export type DistanceHint = {
   axis: "row" | "col" | "either";
   distance: number;
   relation: "exactly" | "not_exactly" | "at_least" | "at_most";
+  roomId?: string | null;
 };
 
 export type DirectionHint = {
@@ -136,6 +142,7 @@ export type DirectionHint = {
   target: HintTarget;
   direction: "above" | "below" | "left_of" | "right_of";
   relation: "is" | "is_not";
+  roomId?: string | null;
 };
 
 export type RoomGroupCountHint = {
