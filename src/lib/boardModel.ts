@@ -17,6 +17,12 @@ export const PLAY_LETTERS: PlayLetter[] = ["A", "B", "C", "D", "E", "F", "G", "H
 
 export const DEFAULT_DIFFICULTY: PuzzleDifficulty = "normal";
 
+const BOARD_SIZE_BY_DIFFICULTY: Record<PuzzleDifficulty, number[]> = {
+  easy: [4, 5, 6],
+  normal: [7, 8],
+  hard: [9]
+};
+
 const LETTER_SLOT_ORDER = [0, 2, 6, 8, 1, 5, 7, 3, 4];
 
 function cellKey(row: number, col: number) {
@@ -80,6 +86,30 @@ function getSafeDifficulty(difficulty?: PuzzleDifficulty | null): PuzzleDifficul
   return DEFAULT_DIFFICULTY;
 }
 
+function pickRandomNumber(values: number[]) {
+  return values[Math.floor(Math.random() * values.length)] ?? values[0] ?? 4;
+}
+
+export function getBoardSizeOptionsForDifficulty(difficulty: PuzzleDifficulty) {
+  return BOARD_SIZE_BY_DIFFICULTY[getSafeDifficulty(difficulty)];
+}
+
+export function getBoardSizeRangeLabel(difficulty: PuzzleDifficulty) {
+  const options = getBoardSizeOptionsForDifficulty(difficulty);
+  const first = options[0];
+  const last = options[options.length - 1];
+
+  if (first === last) {
+    return `${first}x${first}`;
+  }
+
+  return `${first}x${first} t/m ${last}x${last}`;
+}
+
+export function getRandomBoardSizeForDifficulty(difficulty: PuzzleDifficulty) {
+  return pickRandomNumber(getBoardSizeOptionsForDifficulty(difficulty));
+}
+
 function calculateMaxCharacters(rows: number, cols: number, cells: BoardCell[]) {
   const activeRows = new Set<number>();
   const activeCols = new Set<number>();
@@ -100,19 +130,8 @@ function calculateMaxCharacters(rows: number, cols: number, cells: BoardCell[]) 
   return Math.max(1, Math.min(rowCount, colCount, availableCells || rows * cols, PLAY_LETTERS.length));
 }
 
-export function getCharacterCountForDifficulty(difficulty: PuzzleDifficulty, maxCharacters: number) {
-  const max = Math.max(1, Math.min(PLAY_LETTERS.length, Math.floor(maxCharacters)));
-  const minimum = Math.min(max, max >= 3 ? 3 : max);
-
-  if (difficulty === "hard") {
-    return max;
-  }
-
-  if (difficulty === "easy") {
-    return Math.min(max, Math.max(minimum, Math.ceil(max * 0.65)));
-  }
-
-  return Math.min(max, Math.max(minimum, Math.ceil(max * 0.85)));
+export function getCharacterCountForDifficulty(_difficulty: PuzzleDifficulty, maxCharacters: number) {
+  return Math.max(1, Math.min(PLAY_LETTERS.length, Math.floor(maxCharacters)));
 }
 
 function calculateActiveLetters(rows: number, cols: number, cells: BoardCell[], difficulty: PuzzleDifficulty) {
@@ -247,6 +266,11 @@ export function createBoard(rows: number, cols: number, referenceImageUrl: strin
   };
 
   return recalculateRooms(board);
+}
+
+export function createBoardForDifficulty(difficulty: PuzzleDifficulty, referenceImageUrl: string | null) {
+  const size = getRandomBoardSizeForDifficulty(difficulty);
+  return createBoard(size, size, referenceImageUrl, difficulty);
 }
 
 function oldRoomByCell(board: BoardGrid) {
