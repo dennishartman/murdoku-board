@@ -62,7 +62,8 @@ export type HintSubject =
 export type HintTarget =
   | { kind: "character"; letter: PlayLetter }
   | { kind: "gender"; gender: CharacterGender }
-  | { kind: "object"; objectType?: BoardObjectTypeId };
+  | { kind: "object"; objectType?: BoardObjectTypeId }
+  | { kind: "obstacle"; obstacleType?: BoardObstacleTypeId };
 
 export type RowColumnHint = {
   id: string;
