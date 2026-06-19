@@ -56,8 +56,14 @@ function findById<T extends { id: string }>(items: T[], id: string | null | unde
   return items.find((item) => item.id === id) ?? null;
 }
 
-export function getRoomDefinitionByIndex(index: number) {
-  return DETECTIVE_ROOMS[index % DETECTIVE_ROOMS.length];
+export function getRoomDefinitionByIndex(index: number): RoomDefinition {
+  const fallback = DETECTIVE_ROOMS[0];
+
+  if (!fallback) {
+    return { id: "room", name: "Kamer", color: "#e5e7eb" };
+  }
+
+  return DETECTIVE_ROOMS[index % DETECTIVE_ROOMS.length] ?? fallback;
 }
 
 export function getObjectDefinition(id: BoardObjectTypeId | null | undefined) {
