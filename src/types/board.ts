@@ -169,6 +169,7 @@ export type BoardGrid = {
   activeLetters: PlayLetter[];
   activeCharacters: ActiveCharacterSet;
   solution: BoardSolution | null;
+  murdererLetter?: PlayLetter | null;
   hints: Hint[];
 };
 
