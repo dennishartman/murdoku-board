@@ -14,6 +14,10 @@ export type CharacterGender = "male" | "female" | "neutral";
 
 export type CharacterRole = "suspect" | "victim";
 
+export type BoardObjectTypeId = "chair" | "bed" | "bookcase" | "painting" | "safe" | "clock" | "statue" | "candle";
+
+export type BoardObstacleTypeId = "table" | "plant" | "hedge" | "cabinet" | "piano" | "crate" | "fireplace" | "locked_door";
+
 export type CharacterTheme = {
   id: string;
   name: string;
@@ -58,7 +62,7 @@ export type HintSubject =
 export type HintTarget =
   | { kind: "character"; letter: PlayLetter }
   | { kind: "gender"; gender: CharacterGender }
-  | { kind: "object" };
+  | { kind: "object"; objectType?: BoardObjectTypeId };
 
 export type RowColumnHint = {
   id: string;
@@ -142,6 +146,8 @@ export type BoardCell = {
   roomId: string | null;
   isBlocked: boolean;
   isObject: boolean;
+  objectType: BoardObjectTypeId | null;
+  obstacleType: BoardObstacleTypeId | null;
   isCrossed: boolean;
   manualCross: boolean;
   autoCrossSources: string[];
@@ -151,6 +157,7 @@ export type BoardCell = {
 
 export type BoardRoom = {
   id: string;
+  name: string | null;
   color: string;
   cells: Array<[number, number]>;
 };
