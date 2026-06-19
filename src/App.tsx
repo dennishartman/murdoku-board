@@ -110,6 +110,41 @@ function makeHintGroups(board: BoardGrid, hintTexts: string[]) {
   return groups;
 }
 
+function buildPlayableBoard(sourceBoard: BoardGrid) {
+  const normalizedBoard = normalizeBoard(sourceBoard);
+  const solutionResult = generateSolution(normalizedBoard);
+
+  if (!solutionResult.ok) {
+    return {
+      ok: false,
+      board: normalizedBoard,
+      message: solutionResult.message
+    };
+  }
+
+  const solvedBoard = normalizeBoard({
+    ...normalizedBoard,
+    solution: solutionResult.solution,
+    murdererLetter: solutionResult.murdererLetter,
+    hints: []
+  });
+  const hintResult = generateBetaHints(solvedBoard);
+
+  if (!hintResult.ok) {
+    return {
+      ok: false,
+      board: solvedBoard,
+      message: hintResult.message
+    };
+  }
+
+  return {
+    ok: true,
+    board: normalizeBoard({ ...solvedBoard, hints: hintResult.hints }),
+    message: `${solutionResult.message} ${hintResult.message}`
+  };
+}
+
 export function App() {
   const [difficulty, setDifficulty] = useState<PuzzleDifficulty>(DEFAULT_DIFFICULTY);
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
@@ -119,6 +154,7 @@ export function App() {
   const [activePlayTool, setActivePlayTool] = useState<PlayToolMode>("letter");
   const [selectedLetter, setSelectedLetter] = useState<string>(PLAY_LETTERS[0]);
   const [showSolution, setShowSolution] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [selectedHintId, setSelectedHintId] = useState<string | null>(null);
   const [status, setStatus] = useState("Kies een moeilijkheid en maak daarna automatisch een passend bord.");
 
@@ -126,6 +162,7 @@ export function App() {
     const newBoard = createBoardForDifficulty(difficulty, referenceImageUrl);
     setBoard(newBoard);
     setShowSolution(false);
+    setShowDebugPanel(false);
     setSelectedHintId(null);
     setMode("edit");
     setActiveBuilderTool("shape");
@@ -162,6 +199,7 @@ export function App() {
     setDifficulty(loadedBoard.difficulty);
     setReferenceImageUrl(loadedBoard.referenceImageUrl);
     setShowSolution(false);
+    setShowDebugPanel(false);
     setSelectedHintId(loadedBoard.hints[0]?.id ?? null);
     setMode("edit");
     setActiveBuilderTool("shape");
@@ -172,6 +210,7 @@ export function App() {
   function handleNewBoard() {
     setBoard(null);
     setShowSolution(false);
+    setShowDebugPanel(false);
     setSelectedHintId(null);
     setMode("setup");
     setActiveBuilderTool("shape");
@@ -185,14 +224,25 @@ export function App() {
       return;
     }
 
-    const normalizedBoard = normalizeBoard(board);
-    setBoard(normalizedBoard);
+    const result = buildPlayableBoard(board);
+
+    if (!result.ok) {
+      setBoard(result.board);
+      setShowSolution(false);
+      setShowDebugPanel(true);
+      setSelectedHintId(null);
+      setStatus(result.message);
+      return;
+    }
+
+    setBoard(result.board);
     setShowSolution(false);
+    setShowDebugPanel(false);
     setSelectedHintId(null);
-    setSelectedLetter(normalizedBoard.activeLetters[0] ?? PLAY_LETTERS[0]);
+    setSelectedLetter(result.board.activeLetters[0] ?? PLAY_LETTERS[0]);
     setMode("play");
     setActivePlayTool("letter");
-    setStatus("Speelmodus geopend. Kies een personage, kies Aantekening of Plaatsen en tik daarna op een cel.");
+    setStatus(`Speelmodus geopend. Oplossing en hints zijn automatisch gemaakt. ${result.message}`);
   }
 
   function handleEditCurrentBoard() {
@@ -221,6 +271,7 @@ export function App() {
       setBoard(normalizedBoard);
       setShowSolution(false);
       setSelectedHintId(null);
+      setShowDebugPanel(true);
       setStatus(result.message);
       return;
     }
@@ -228,6 +279,7 @@ export function App() {
     const nextBoard = normalizeBoard({ ...normalizedBoard, solution: result.solution, murdererLetter: result.murdererLetter, hints: [] });
     setBoard(nextBoard);
     setShowSolution(true);
+    setShowDebugPanel(true);
     setSelectedHintId(null);
     setStatus(`${result.message} Elke rij en kolom heeft precies 1 personage.`);
   }
@@ -243,14 +295,24 @@ export function App() {
     if (!result.ok) {
       setBoard(normalizedBoard);
       setSelectedHintId(null);
+      setShowDebugPanel(true);
       setStatus(result.message);
       return;
     }
 
     const nextBoard = normalizeBoard({ ...normalizedBoard, hints: result.hints });
     setBoard(nextBoard);
+    setShowDebugPanel(true);
     setSelectedHintId(result.hints[0]?.id ?? null);
-    setStatus(`${result.message} Selecteer een hint in de bewerkmodus om deze op het bord te markeren.`);
+    setStatus(`${result.message} Selecteer een hint in het debugscherm om deze op het bord te markeren.`);
+  }
+
+  function handleToggleDebugPanel() {
+    if (showDebugPanel) {
+      setSelectedHintId(null);
+    }
+
+    setShowDebugPanel(!showDebugPanel);
   }
 
   function handleBoardChange(nextBoard: BoardGrid) {
@@ -327,9 +389,7 @@ export function App() {
             activeTool={activeBuilderTool}
             roomCount={board.rooms.length}
             activeCells={activeCells}
-            solutionReady={Boolean(board.solution)}
-            hintCount={hintCount}
-            showSolution={showSolution}
+            showDebugPanel={showDebugPanel}
             onToolChange={(tool) => {
               setActiveBuilderTool(tool);
               setStatus(tool === "wall" ? "Klik of sleep over een rand. Start horizontaal voor horizontale lijnen en verticaal voor verticale lijnen." : "Tool gewijzigd.");
@@ -337,66 +397,94 @@ export function App() {
             onSave={handleSave}
             onPlay={handlePlayBoard}
             onNewBoard={handleNewBoard}
-            onGenerateSolution={handleGenerateSolution}
-            onGenerateHints={handleGenerateHints}
-            onToggleSolution={() => setShowSolution((value) => !value)}
+            onToggleDebugPanel={handleToggleDebugPanel}
           />
 
-          {hintCount > 0 && (
-            <section className="card hintDebugCard">
-              <div className="sectionTitle compact hintDebugTitle">
-                <span>3</span>
+          {showDebugPanel && (
+            <section className="card debugSettingsCard">
+              <div className="sectionTitle compact debugSettingsTitle">
+                <span>?</span>
                 <div>
-                  <h2>Hints controleren</h2>
-                  <p>Klik op een hintzin om de relevante cellen op het bord te markeren. De hints zijn gegroepeerd per personage.</p>
+                  <h2>Debug instellingen</h2>
+                  <p>Controleer de automatische oplossing, hints en hintmarkeringen. Normale spelers hoeven dit scherm niet te gebruiken.</p>
                 </div>
-                <button className="ghostButton smallButton" type="button" onClick={() => setSelectedHintId(null)} disabled={!selectedHintId}>Wis selectie</button>
+                <button className="ghostButton smallButton" type="button" onClick={handleToggleDebugPanel}>Sluiten</button>
               </div>
 
-              <div className="hintDebugText" aria-label="Gegenereerde hints">
-                {hintGroups.map((group) => (
-                  <article className="hintTextGroup" key={group.key}>
-                    <h3>{group.title}</h3>
-                    <p>
-                      {group.items.map((item) => (
-                        <button
-                          key={item.hint.id}
-                          className={selectedHintId === item.hint.id ? "hintInlineItem activeHintInlineItem" : "hintInlineItem"}
-                          type="button"
-                          onClick={() => setSelectedHintId((current) => (current === item.hint.id ? null : item.hint.id))}
-                        >
-                          <strong>{item.index + 1}.</strong>
-                          <span>{item.text}</span>
-                        </button>
-                      ))}
-                    </p>
-                  </article>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {showSolution && board.solution && (
-            <section className="card solutionCard">
-              <div className="sectionTitle compact">
-                <span>{hintCount > 0 ? "4" : "3"}</span>
-                <div>
-                  <h2>Verborgen oplossing</h2>
-                  <p>
-                    Debugweergave voor het testen. {murdererRow ? `${murdererRow.name} is de moordenaar en staat bij het slachtoffer in kamer ${murdererRow.roomId?.replace("room-", "") ?? "?"}.` : "De moordenaar wordt rood gemarkeerd zodra de oplossing bekend is."}
-                  </p>
+              <div className="debugSummaryGrid">
+                <div className="debugSummaryItem">
+                  <span>Oplossing</span>
+                  <strong>{board.solution ? "aanwezig" : "ontbreekt"}</strong>
+                </div>
+                <div className="debugSummaryItem">
+                  <span>Hints</span>
+                  <strong>{hintCount}</strong>
+                </div>
+                <div className="debugSummaryItem">
+                  <span>Hintselectie</span>
+                  <strong>{selectedHintId ? "actief" : "geen"}</strong>
+                </div>
+                <div className="debugSummaryItem">
+                  <span>Oplossing tonen</span>
+                  <strong>{showSolution ? "ja" : "nee"}</strong>
                 </div>
               </div>
 
-              <div className="solutionGrid">
-                {solutionRows.map((entry) => (
-                  <div className={entry.isMurderer ? "solutionItem murdererSolutionItem" : "solutionItem"} key={entry.letter}>
-                    <strong>{entry.letter}</strong>
-                    <span>{entry.name}</span>
-                    <small>{entry.role === "victim" ? "slachtoffer" : entry.isMurderer ? "moordenaar" : "verdachte"}</small>
-                    <em>Rij {entry.row}, kolom {entry.col}, kamer {entry.roomId?.replace("room-", "") ?? "?"}</em>
+              <div className="buttonRow debugActionRow">
+                <button className="primaryButton" type="button" onClick={handleGenerateSolution}>Maak oplossing</button>
+                <button className="primaryButton" type="button" onClick={handleGenerateHints} disabled={!board.solution}>Genereer hints</button>
+                <button className="ghostButton" type="button" onClick={() => setShowSolution((value) => !value)} disabled={!board.solution}>{showSolution ? "Verberg oplossing" : "Toon oplossing"}</button>
+                <button className="ghostButton" type="button" onClick={() => setSelectedHintId(null)} disabled={!selectedHintId}>Wis hintselectie</button>
+              </div>
+
+              <div className="debugPanelSection">
+                <h3>Hints controleren</h3>
+                <p>Klik op een hintzin om de relevante cellen op het bord te markeren. De hints blijven gegroepeerd per personage.</p>
+
+                {hintCount > 0 ? (
+                  <div className="hintDebugText" aria-label="Gegenereerde hints">
+                    {hintGroups.map((group) => (
+                      <article className="hintTextGroup" key={group.key}>
+                        <h3>{group.title}</h3>
+                        <p>
+                          {group.items.map((item) => (
+                            <button
+                              key={item.hint.id}
+                              className={selectedHintId === item.hint.id ? "hintInlineItem activeHintInlineItem" : "hintInlineItem"}
+                              type="button"
+                              onClick={() => setSelectedHintId((current) => (current === item.hint.id ? null : item.hint.id))}
+                            >
+                              <strong>{item.index + 1}.</strong>
+                              <span>{item.text}</span>
+                            </button>
+                          ))}
+                        </p>
+                      </article>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <p className="debugEmptyText">Er zijn nog geen hints. Klik op Genereer hints of open Speel bord om dit automatisch te laten doen.</p>
+                )}
+              </div>
+
+              <div className="debugPanelSection">
+                <h3>Verborgen oplossing</h3>
+                <p>
+                  {murdererRow ? `${murdererRow.name} is de moordenaar en staat bij het slachtoffer in kamer ${murdererRow.roomId?.replace("room-", "") ?? "?"}.` : "Maak eerst een oplossing om de volledige debugweergave te zien."}
+                </p>
+
+                {showSolution && board.solution && (
+                  <div className="solutionGrid">
+                    {solutionRows.map((entry) => (
+                      <div className={entry.isMurderer ? "solutionItem murdererSolutionItem" : "solutionItem"} key={entry.letter}>
+                        <strong>{entry.letter}</strong>
+                        <span>{entry.name}</span>
+                        <small>{entry.role === "victim" ? "slachtoffer" : entry.isMurderer ? "moordenaar" : "verdachte"}</small>
+                        <em>Rij {entry.row}, kolom {entry.col}, kamer {entry.roomId?.replace("room-", "") ?? "?"}</em>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </section>
           )}
