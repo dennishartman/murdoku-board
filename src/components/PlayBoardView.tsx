@@ -406,7 +406,11 @@ export function PlayBoardView({
                     <ObjectIcon type={cell.objectType} />
                   </span>
                 )}
-                {isBlocked && <span className="obstacleMarker playObstacleMarker">{obstacleDefinition?.shortLabel ?? "Stop"}</span>}
+                {isBlocked && (
+                  <span className="obstacleMarker playObstacleMarker" title={obstacleDefinition?.name ?? "Stop"}>
+                    <ObjectIcon type={cell.obstacleType} kind="obstacle" />
+                  </span>
+                )}
                 {debugSolutionLetter && (
                   <span className="solutionMarker" title={isMurderer ? `Moordenaar ${debugSolutionLetter}` : `Oplossing ${debugSolutionLetter}`}>
                     {debugSolutionLetter}
