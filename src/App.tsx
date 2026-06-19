@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { BoardEditorView } from "./components/BoardView";
 import { PlayBoardView } from "./components/PlayBoardView";
 import { SetupPanel } from "./components/SetupPanel";
 import { ToolBar } from "./components/ToolBar";
 import { createBoardForDifficulty, DEFAULT_DIFFICULTY, getBoardSizeRangeLabel, normalizeBoard, PLAY_LETTERS } from "./lib/boardModel";
+import { describeHints } from "./lib/hintEngine";
 import { generateBetaHints } from "./lib/hintGenerator";
 import { describeSolution, generateSolution } from "./lib/solutionGenerator";
 import { loadBoard, saveBoard } from "./lib/storage";
@@ -32,12 +33,14 @@ export function App() {
   const [activePlayTool, setActivePlayTool] = useState<PlayToolMode>("letter");
   const [selectedLetter, setSelectedLetter] = useState<string>(PLAY_LETTERS[0]);
   const [showSolution, setShowSolution] = useState(false);
+  const [selectedHintId, setSelectedHintId] = useState<string | null>(null);
   const [status, setStatus] = useState("Kies een moeilijkheid en maak daarna automatisch een passend bord.");
 
   function handleCreateBoard() {
     const newBoard = createBoardForDifficulty(difficulty, referenceImageUrl);
     setBoard(newBoard);
     setShowSolution(false);
+    setSelectedHintId(null);
     setMode("edit");
     setActiveBuilderTool("shape");
     setSelectedLetter(newBoard.activeLetters[0] ?? PLAY_LETTERS[0]);
@@ -73,6 +76,7 @@ export function App() {
     setDifficulty(loadedBoard.difficulty);
     setReferenceImageUrl(loadedBoard.referenceImageUrl);
     setShowSolution(false);
+    setSelectedHintId(loadedBoard.hints[0]?.id ?? null);
     setMode("edit");
     setActiveBuilderTool("shape");
     setSelectedLetter(loadedBoard.activeLetters[0] ?? PLAY_LETTERS[0]);
@@ -82,6 +86,7 @@ export function App() {
   function handleNewBoard() {
     setBoard(null);
     setShowSolution(false);
+    setSelectedHintId(null);
     setMode("setup");
     setActiveBuilderTool("shape");
     setActivePlayTool("letter");
@@ -97,6 +102,7 @@ export function App() {
     const normalizedBoard = normalizeBoard(board);
     setBoard(normalizedBoard);
     setShowSolution(false);
+    setSelectedHintId(null);
     setSelectedLetter(normalizedBoard.activeLetters[0] ?? PLAY_LETTERS[0]);
     setMode("play");
     setActivePlayTool("letter");
@@ -128,6 +134,7 @@ export function App() {
     if (!result.ok) {
       setBoard(normalizedBoard);
       setShowSolution(false);
+      setSelectedHintId(null);
       setStatus(result.message);
       return;
     }
@@ -135,6 +142,7 @@ export function App() {
     const nextBoard = normalizeBoard({ ...normalizedBoard, solution: result.solution, murdererLetter: result.murdererLetter, hints: [] });
     setBoard(nextBoard);
     setShowSolution(true);
+    setSelectedHintId(null);
     setStatus(`${result.message} Elke rij en kolom heeft precies 1 personage.`);
   }
 
@@ -148,13 +156,15 @@ export function App() {
 
     if (!result.ok) {
       setBoard(normalizedBoard);
+      setSelectedHintId(null);
       setStatus(result.message);
       return;
     }
 
     const nextBoard = normalizeBoard({ ...normalizedBoard, hints: result.hints });
     setBoard(nextBoard);
-    setStatus(`${result.message} Open de speelmodus en klik op Hints om ze te bekijken.`);
+    setSelectedHintId(result.hints[0]?.id ?? null);
+    setStatus(`${result.message} Selecteer een hint in de bewerkmodus om deze op het bord te markeren.`);
   }
 
   function handleBoardChange(nextBoard: BoardGrid) {
@@ -164,6 +174,10 @@ export function App() {
     if (!normalizedBoard.solution) {
       setShowSolution(false);
     }
+
+    if (selectedHintId && !normalizedBoard.hints.some((hint) => hint.id === selectedHintId)) {
+      setSelectedHintId(null);
+    }
   }
 
   const activeCells = board?.cells.filter((cell) => cell.isActive).length ?? 0;
@@ -172,6 +186,8 @@ export function App() {
   const solutionRows = board ? describeSolution(board) : [];
   const murdererRow = solutionRows.find((entry) => entry.isMurderer);
   const hintCount = board?.hints.length ?? 0;
+  const hintTexts = useMemo(() => (board ? describeHints(board.hints, board, board.activeCharacters) : []), [board]);
+  const selectedHint = board?.hints.find((hint) => hint.id === selectedHintId) ?? null;
 
   return (
     <main className={mode === "play" ? "appShell playShell" : "appShell"}>
@@ -239,10 +255,37 @@ export function App() {
             onToggleSolution={() => setShowSolution((value) => !value)}
           />
 
+          {hintCount > 0 && (
+            <section className="card hintDebugCard">
+              <div className="sectionTitle compact hintDebugTitle">
+                <span>3</span>
+                <div>
+                  <h2>Hints controleren</h2>
+                  <p>Klik op een hint om de relevante cellen op het bord te markeren. Dit is alleen een hulpmiddel in de bewerkmodus.</p>
+                </div>
+                <button className="ghostButton smallButton" type="button" onClick={() => setSelectedHintId(null)} disabled={!selectedHintId}>Wis selectie</button>
+              </div>
+
+              <div className="hintDebugList" aria-label="Gegenereerde hints">
+                {board.hints.map((hint, index) => (
+                  <button
+                    key={hint.id}
+                    className={selectedHintId === hint.id ? "hintDebugItem activeHintDebugItem" : "hintDebugItem"}
+                    type="button"
+                    onClick={() => setSelectedHintId((current) => (current === hint.id ? null : hint.id))}
+                  >
+                    <strong>{index + 1}</strong>
+                    <span>{hintTexts[index] ?? "Onbekende hint."}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           {showSolution && board.solution && (
             <section className="card solutionCard">
               <div className="sectionTitle compact">
-                <span>3</span>
+                <span>{hintCount > 0 ? "4" : "3"}</span>
                 <div>
                   <h2>Verborgen oplossing</h2>
                   <p>
@@ -264,7 +307,7 @@ export function App() {
             </section>
           )}
 
-          <BoardEditorView board={board} activeTool={activeBuilderTool} showSolution={showSolution} onBoardChange={handleBoardChange} />
+          <BoardEditorView board={board} activeTool={activeBuilderTool} showSolution={showSolution} selectedHint={selectedHint} onBoardChange={handleBoardChange} />
         </>
       )}
 
