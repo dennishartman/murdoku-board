@@ -59,6 +59,22 @@ function isRoomLabelAnchor(board: BoardGrid, roomId: string | null, row: number,
   return Boolean(firstCell && firstCell[0] === row && firstCell[1] === col);
 }
 
+function getSolutionLetter(board: BoardGrid, row: number, col: number): PlayLetter | null {
+  if (!board.solution) {
+    return null;
+  }
+
+  for (const letter of board.activeLetters) {
+    const position = board.solution[letter];
+
+    if (position?.row === row && position.col === col) {
+      return letter;
+    }
+  }
+
+  return null;
+}
+
 function wallClass(board: BoardGrid, row: number, col: number, side: "top" | "right" | "bottom" | "left") {
   return hasBoundary(board, row, col, side) ? "roomWall" : "gridLine";
 }
@@ -123,6 +139,7 @@ export function PlayBoardView({
 }: PlayBoardViewProps) {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [hintsOpen, setHintsOpen] = useState(false);
+  const [debugSolutionOpen, setDebugSolutionOpen] = useState(false);
   const activeCells = useMemo(() => board.cells.filter((cell) => cell.isActive).length, [board.cells]);
   const activeLetters = useMemo(() => (board.activeLetters.length > 0 ? board.activeLetters : PLAY_LETTERS), [board.activeLetters]);
   const suspectCount = Math.max(0, activeLetters.length - 1);
@@ -163,6 +180,12 @@ export function PlayBoardView({
       window.clearTimeout(timeoutId);
     };
   }, [toastMessage]);
+
+  useEffect(() => {
+    if (!board.solution) {
+      setDebugSolutionOpen(false);
+    }
+  }, [board.solution]);
 
   function selectLetter(letter: string) {
     onLetterChange(letter);
@@ -239,6 +262,7 @@ export function PlayBoardView({
 
         <div className="playHeaderButtons">
           <button className="ghostButton smallButton" type="button" onClick={() => setHintsOpen((open) => !open)}>{hintsOpen ? "Verberg hints" : "Hints"}</button>
+          <button className="ghostButton smallButton" type="button" onClick={() => setDebugSolutionOpen((open) => !open)} disabled={!board.solution}>{debugSolutionOpen ? "Verberg oplossing" : "Debug oplossing"}</button>
           <button className="ghostButton smallButton" type="button" onClick={onMainMenu}>Hoofdmenu</button>
         </div>
       </div>
@@ -257,6 +281,8 @@ export function PlayBoardView({
             const objectDefinition = getObjectDefinition(cell.objectType);
             const obstacleDefinition = getObstacleDefinition(cell.obstacleType);
             const showRoomName = isRoomLabelAnchor(board, cell.roomId, cell.row, cell.col);
+            const debugSolutionLetter = debugSolutionOpen ? getSolutionLetter(board, cell.row, cell.col) : null;
+            const isMurderer = Boolean(debugSolutionLetter && board.murdererLetter === debugSolutionLetter);
             const style: CSSProperties = {
               backgroundColor: isBlocked ? "#9ca3af" : roomColor(board, cell.roomId),
               ...cellBorderStyle(board, cell.row, cell.col)
@@ -267,7 +293,9 @@ export function PlayBoardView({
               "playCell",
               isBlocked ? "blockedCell" : "",
               isObject ? "objectCell" : "",
-              cell.isCrossed ? "crossedCell" : ""
+              cell.isCrossed ? "crossedCell" : "",
+              debugSolutionLetter ? "solutionCell" : "",
+              isMurderer ? "solutionMurdererCell" : ""
             ].filter(Boolean).join(" ");
 
             return (
@@ -287,10 +315,15 @@ export function PlayBoardView({
                 {showRoomName && <span className="roomNameLabel playRoomNameLabel">{roomName(board, cell.roomId)}</span>}
                 {isObject && <span className="objectMarker playObjectMarker">{objectDefinition?.shortLabel ?? "Obj"}</span>}
                 {isBlocked && <span className="obstacleMarker playObstacleMarker">{obstacleDefinition?.shortLabel ?? "Stop"}</span>}
-                {!isBlocked && !cell.isCrossed && cell.finalLetter && (
+                {debugSolutionLetter && (
+                  <span className="solutionMarker" title={isMurderer ? `Moordenaar ${debugSolutionLetter}` : `Oplossing ${debugSolutionLetter}`}>
+                    {debugSolutionLetter}
+                  </span>
+                )}
+                {!debugSolutionLetter && !isBlocked && !cell.isCrossed && cell.finalLetter && (
                   <span className="finalLetter" aria-hidden="true">{cell.finalLetter}</span>
                 )}
-                {!isBlocked && !cell.isCrossed && !cell.finalLetter && (
+                {!debugSolutionLetter && !isBlocked && !cell.isCrossed && !cell.finalLetter && (
                   <div className="miniSlotGrid" aria-hidden="true">
                     {cell.playMarks.map((mark, index) => (
                       <span className="miniSlot" key={index}>{mark && !finalLetters.has(mark) ? mark : null}</span>
