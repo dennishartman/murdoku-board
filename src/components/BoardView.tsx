@@ -274,7 +274,7 @@ export function BoardEditorView({ board, activeTool, showSolution = false, onBoa
 
       {showSolution && board.solution && (
         <div className="tipBox solutionOverlayTip">
-          Oplossing wordt op het bord getoond. Elke blauwe marker is een verborgen positie.
+          Oplossing wordt op het bord getoond. De rode marker is de moordenaar en staat in dezelfde kamer als het slachtoffer.
         </div>
       )}
 
@@ -293,6 +293,7 @@ export function BoardEditorView({ board, activeTool, showSolution = false, onBoa
           const isBlocked = cell.isActive && cell.isBlocked;
           const isObject = cell.isActive && cell.isObject;
           const solutionLetter = showSolution && cell.isActive ? getSolutionLetter(board, cell.row, cell.col) : null;
+          const isMurderer = Boolean(solutionLetter && board.murdererLetter === solutionLetter);
           const cellStyle: CSSProperties = cell.isActive
             ? {
                 backgroundColor: isBlocked ? "#9ca3af" : roomColor(board, cell.roomId),
@@ -312,7 +313,8 @@ export function BoardEditorView({ board, activeTool, showSolution = false, onBoa
             cell.isActive ? "" : "inactiveCell",
             isBlocked ? "blockedCell" : "",
             isObject ? "objectCell" : "",
-            solutionLetter ? "solutionCell" : ""
+            solutionLetter ? "solutionCell" : "",
+            isMurderer ? "solutionMurdererCell" : ""
           ].filter(Boolean).join(" ");
 
           return (
@@ -331,52 +333,16 @@ export function BoardEditorView({ board, activeTool, showSolution = false, onBoa
             >
               {isObject && <span className="objectMarker" />}
               {solutionLetter && (
-                <span className="solutionMarker" title={`Oplossing ${solutionLetter}`}>
+                <span className="solutionMarker" title={isMurderer ? `Moordenaar ${solutionLetter}` : `Oplossing ${solutionLetter}`}>
                   {solutionLetter}
                 </span>
               )}
               {cell.isActive && activeTool === "wall" && (
                 <>
-                  <button
-                    className="edgeHit edgeTop"
-                    type="button"
-                    data-edge-row={cell.row}
-                    data-edge-col={cell.col}
-                    data-edge-side="top"
-                    onClick={handleEdgeClick}
-                    onPointerDown={(event) => handleEdgePointerDown(event, cell.row, cell.col, "top")}
-                    aria-label="Bovenrand"
-                  />
-                  <button
-                    className="edgeHit edgeRight"
-                    type="button"
-                    data-edge-row={cell.row}
-                    data-edge-col={cell.col}
-                    data-edge-side="right"
-                    onClick={handleEdgeClick}
-                    onPointerDown={(event) => handleEdgePointerDown(event, cell.row, cell.col, "right")}
-                    aria-label="Rechterrand"
-                  />
-                  <button
-                    className="edgeHit edgeBottom"
-                    type="button"
-                    data-edge-row={cell.row}
-                    data-edge-col={cell.col}
-                    data-edge-side="bottom"
-                    onClick={handleEdgeClick}
-                    onPointerDown={(event) => handleEdgePointerDown(event, cell.row, cell.col, "bottom")}
-                    aria-label="Onderrand"
-                  />
-                  <button
-                    className="edgeHit edgeLeft"
-                    type="button"
-                    data-edge-row={cell.row}
-                    data-edge-col={cell.col}
-                    data-edge-side="left"
-                    onClick={handleEdgeClick}
-                    onPointerDown={(event) => handleEdgePointerDown(event, cell.row, cell.col, "left")}
-                    aria-label="Linkerrand"
-                  />
+                  <button className="edgeHit edgeTop" type="button" data-edge-row={cell.row} data-edge-col={cell.col} data-edge-side="top" onClick={handleEdgeClick} onPointerDown={(event) => handleEdgePointerDown(event, cell.row, cell.col, "top")} aria-label="Bovenrand" />
+                  <button className="edgeHit edgeRight" type="button" data-edge-row={cell.row} data-edge-col={cell.col} data-edge-side="right" onClick={handleEdgeClick} onPointerDown={(event) => handleEdgePointerDown(event, cell.row, cell.col, "right")} aria-label="Rechterrand" />
+                  <button className="edgeHit edgeBottom" type="button" data-edge-row={cell.row} data-edge-col={cell.col} data-edge-side="bottom" onClick={handleEdgeClick} onPointerDown={(event) => handleEdgePointerDown(event, cell.row, cell.col, "bottom")} aria-label="Onderrand" />
+                  <button className="edgeHit edgeLeft" type="button" data-edge-row={cell.row} data-edge-col={cell.col} data-edge-side="left" onClick={handleEdgeClick} onPointerDown={(event) => handleEdgePointerDown(event, cell.row, cell.col, "left")} aria-label="Linkerrand" />
                 </>
               )}
             </div>
