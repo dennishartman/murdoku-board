@@ -4,6 +4,7 @@ import { ensureActiveCharacterSet } from "../lib/characterPool";
 import { describeHints } from "../lib/hintEngine";
 import { getObjectDefinition, getObstacleDefinition } from "../lib/themeContent";
 import type { ActiveCharacterSet, BoardGrid, Hint, HintSubject, PlayLetter, PlayToolMode } from "../types/board";
+import { ObjectIcon } from "./ObjectIcon";
 
 type PlayBoardViewProps = {
   board: BoardGrid;
@@ -400,7 +401,11 @@ export function PlayBoardView({
                 }}
               >
                 {showRoomName && <span className="roomNameLabel playRoomNameLabel">{roomName(board, cell.roomId)}</span>}
-                {isObject && <span className="objectMarker playObjectMarker">{objectDefinition?.shortLabel ?? "Obj"}</span>}
+                {isObject && (
+                  <span className="objectMarker playObjectMarker" title={objectDefinition?.name ?? "Object"}>
+                    <ObjectIcon type={cell.objectType} />
+                  </span>
+                )}
                 {isBlocked && <span className="obstacleMarker playObstacleMarker">{obstacleDefinition?.shortLabel ?? "Stop"}</span>}
                 {debugSolutionLetter && (
                   <span className="solutionMarker" title={isMurderer ? `Moordenaar ${debugSolutionLetter}` : `Oplossing ${debugSolutionLetter}`}>
@@ -483,7 +488,7 @@ export function PlayBoardView({
                 ))}
               </div>
             ) : (
-              <p>Nog geen hints gekoppeld aan dit bord. De beta-engine ondersteunt al rij, kolom, kamer, naast, diagonaal, rand, afstand en gender-aantallen.</p>
+              <p>Nog geen hints gekoppeld aan dit bord. De beta-engine ondersteunt rij, kolom, kamer, naast, diagonaal, richting en kamer-aantallen.</p>
             )}
           </div>
         )}
